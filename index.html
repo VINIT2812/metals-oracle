@@ -210,9 +210,9 @@ let crossCheck  = {}; // { Gold: {a: 141774, b: 141820, diff: 0.03%}, ... }
 
 function applyRates(rates){
   // MetalPriceAPI base=INR: INRXAU = INR per 0.1 troy oz, INRXAG = INR per troy oz
-  if(rates.INRXAU) liveData.Gold     = rates.INRXAU * (100/31.1035);   // per 10g
+  if(rates.INRXAU) liveData.Gold     = rates.INRXAU * (10/31.1035);   // per 10g
   if(rates.INRXAG) liveData.Silver   = rates.INRXAG * (1000/31.1035);  // per kg
-  if(rates.INRXPT) liveData.Platinum = rates.INRXPT * (100/31.1035);   // per 10g
+  if(rates.INRXPT) liveData.Platinum = rates.INRXPT * (10/31.1035);   // per 10g
   if(rates.INRXAU) dataSource.Gold     = "MetalPriceAPI";
   if(rates.INRXAG) dataSource.Silver   = "MetalPriceAPI";
   if(rates.INRXPT) dataSource.Platinum = "MetalPriceAPI";
@@ -346,10 +346,10 @@ async function fetchMetalPriceAPI(){
       console.log("MetalPriceAPI proxy "+(i+1)+" response:", JSON.stringify(data).slice(0,100));
       if(data?.rates && Object.keys(data.rates).length > 0){
         const prices = {};
-        // MetalPriceAPI base=INR: rate × (100/31.1035) for Gold/Platinum per 10g
+        // MetalPriceAPI base=INR: rate × (10/31.1035) for Gold/Platinum per 10g
         // rate × (1000/31.1035) for Silver per kg
         if(data.rates.INRXAU){
-          const v = data.rates.INRXAU * (100/31.1035);
+          const v = data.rates.INRXAU * (10/31.1035);
           // Sanity: Gold per 10g = 80,000–300,000 INR
           prices.Gold = (v>=80000&&v<=300000) ? v : null;
           if(!prices.Gold) console.warn("MetalPriceAPI Gold out of range:", v, "raw rate:", data.rates.INRXAU);
@@ -360,7 +360,7 @@ async function fetchMetalPriceAPI(){
           if(!prices.Silver) console.warn("MetalPriceAPI Silver out of range:", v);
         }
         if(data.rates.INRXPT){
-          const v = data.rates.INRXPT * (100/31.1035);
+          const v = data.rates.INRXPT * (10/31.1035);
           prices.Platinum = (v>=30000&&v<=200000) ? v : null;
           if(!prices.Platinum) console.warn("MetalPriceAPI Platinum out of range:", v);
         }
