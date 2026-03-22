@@ -267,12 +267,12 @@ async function fetchLiveData(){
   const KEY=METALS_API_KEY;
   const BASE = "https://api.metalpriceapi.com/v1/latest?api_key="+KEY+"&base=INR&currencies=XAU,XAG,XCU,XPT";
   const PROXIES = [
-    {url:"https://corsproxy.io/?"+encodeURIComponent(BASE),            parse:false},
-    {url:"https://api.allorigins.win/get?url="+encodeURIComponent(BASE), parse:true},
-    {url:"https://thingproxy.freeboard.io/fetch/"+BASE,                parse:false},
-    {url:"https://api.codetabs.com/v1/proxy?quest="+encodeURIComponent(BASE), parse:false},
-    {url:"https://yacdn.org/proxy/"+BASE,                              parse:false},
-    {url:"https://cors-anywhere.herokuapp.com/"+BASE,                  parse:false},
+    {url:BASE,                                                                          parse:false}, // direct
+    {url:"https://corsproxy.io/?"+encodeURIComponent(BASE),                            parse:false}, // proxy 1
+    {url:"https://api.allorigins.win/get?url="+encodeURIComponent(BASE),               parse:true},  // proxy 2
+    {url:"https://proxy.cors.sh/"+BASE,                                                parse:false}, // proxy 3
+    {url:"https://corsproxy.io/?url="+encodeURIComponent(BASE),                        parse:false}, // proxy 4
+    {url:"https://jsonp.afeld.me/?url="+encodeURIComponent(BASE),                      parse:false}, // proxy 5
   ];
 
   let fetched = false;
@@ -1713,10 +1713,10 @@ function buildForecast(){
   </div>
 
   <!-- ROW 2: XAI Prediction Driver -->
-  ${buildXAIWidget()}
+  ${(()=>{ try{ return buildXAIWidget(); } catch(e){ return `<div class="card" style="padding:20px"><div style="font-size:11px;color:#FF6666">XAI Widget error: ${e.message}</div></div>`; } })()}
 
   <!-- ROW 3: Correlation Matrix -->
-  ${buildCorrelationMatrix()}
+  ${(()=>{ try{ return buildCorrelationMatrix(); } catch(e){ return `<div class="card" style="padding:20px"><div style="font-size:11px;color:#FF6666">Correlation error: ${e.message}</div></div>`; } })()}
 
   </div>`;
 }
@@ -1813,6 +1813,16 @@ function liveChange1d(metal){
   return METALS[metal].change_1d; // fallback to hardcoded
 }
 
+// ── Real attention weights — global constant ──────────────────
+// Extracted via MultiHeadAttention scores from BiLSTM v2
+// Shape: (4 heads, 60, 60) → averaged → last row → last 30 timesteps
+const REAL_ATTENTION = {
+  Gold:     [0.0163,0.0164,0.0164,0.0164,0.0165,0.0165,0.0166,0.0166,0.0167,0.0167,0.0167,0.0168,0.0168,0.0167,0.0167,0.0167,0.0166,0.0166,0.0165,0.0164,0.0164,0.0163,0.0163,0.0162,0.0161,0.0160,0.0159,0.0157,0.0154,0.0148],
+  Silver:   [0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0165,0.0165,0.0165,0.0164,0.0164,0.0164,0.0164,0.0165,0.0165],
+  Copper:   [0.0165,0.0165,0.0165,0.0166,0.0166,0.0166,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0166,0.0166,0.0166,0.0165,0.0164,0.0164,0.0163,0.0162,0.0161,0.0160,0.0158,0.0157,0.0155,0.0153,0.0151,0.0147,0.0144,0.0141],
+  Platinum: [0.0168,0.0168,0.0168,0.0168,0.0168,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0165,0.0165,0.0165,0.0165,0.0164,0.0164,0.0164,0.0164,0.0164,0.0166],
+};
+
 // ── Master XAI computer — derives everything from live price + hist ──
 function computeXAI(metal){
   const m    = METALS[metal];
@@ -1828,15 +1838,6 @@ function computeXAI(metal){
   const ma7   = calcMA(prices, 7);
   const ma30  = calcMA(prices, 30);
   const chg1d = liveChange1d(metal);
-
-  // Real attention weights from BiLSTM v2 — extracted via MultiHeadAttention scores
-  // Shape: (4 heads, 60, 60) → averaged → last row (today's query) → last 30 timesteps
-  const REAL_ATTENTION = {
-    Gold:     [0.0163,0.0164,0.0164,0.0164,0.0165,0.0165,0.0166,0.0166,0.0167,0.0167,0.0167,0.0168,0.0168,0.0167,0.0167,0.0167,0.0166,0.0166,0.0165,0.0164,0.0164,0.0163,0.0163,0.0162,0.0161,0.0160,0.0159,0.0157,0.0154,0.0148],
-    Silver:   [0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0165,0.0165,0.0165,0.0164,0.0164,0.0164,0.0164,0.0165,0.0165],
-    Copper:   [0.0165,0.0165,0.0165,0.0166,0.0166,0.0166,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0166,0.0166,0.0166,0.0165,0.0164,0.0164,0.0163,0.0162,0.0161,0.0160,0.0158,0.0157,0.0155,0.0153,0.0151,0.0147,0.0144,0.0141],
-    Platinum: [0.0168,0.0168,0.0168,0.0168,0.0168,0.0167,0.0167,0.0167,0.0167,0.0167,0.0167,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0166,0.0165,0.0165,0.0165,0.0165,0.0164,0.0164,0.0164,0.0164,0.0164,0.0166],
-  };
 
   // Use real attention weights — normalise to sum=1
   const rawAtt = REAL_ATTENTION[metal];
@@ -2001,7 +2002,7 @@ function buildXAIWidget(){
           <div style="font-size:9px;color:#CCC;margin-bottom:6px">ATTENTION INSIGHT · REAL MODEL WEIGHTS</div>
           <div style="font-size:10px;color:#AAA;line-height:1.6">
             The BiLSTM attention is <span style="color:${m.color}">nearly uniform across all 60 timesteps</span>
-            (last 7 days = ${(attNorm.slice(-7).reduce((a,b)=>a+b,0)*100).toFixed(1)}% weight),
+            (last 7 days = ${(xd.attention.slice(-7).reduce((a,b)=>a+b,0)*100).toFixed(1)}% weight),
             indicating the model integrates the full 60-day history rather than focusing on recency alone.
             Peak attention at days 10–14 ago suggests medium-term momentum patterns dominate ${selectedMetal} pricing.
           </div>
