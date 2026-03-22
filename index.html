@@ -267,18 +267,17 @@ async function fetchLiveData(){
   const KEY=METALS_API_KEY;
   const BASE = "https://api.metalpriceapi.com/v1/latest?api_key="+KEY+"&base=INR&currencies=XAU,XAG,XCU,XPT";
   const PROXIES = [
-    {url:BASE,                                                                          parse:false}, // direct
-    {url:"https://corsproxy.io/?"+encodeURIComponent(BASE),                            parse:false}, // proxy 1
-    {url:"https://api.allorigins.win/get?url="+encodeURIComponent(BASE),               parse:true},  // proxy 2
-    {url:"https://proxy.cors.sh/"+BASE,                                                parse:false}, // proxy 3
-    {url:"https://corsproxy.io/?url="+encodeURIComponent(BASE),                        parse:false}, // proxy 4
-    {url:"https://jsonp.afeld.me/?url="+encodeURIComponent(BASE),                      parse:false}, // proxy 5
+    {url:"https://api.allorigins.win/get?url="+encodeURIComponent(BASE),               parse:true},
+    {url:"https://api.allorigins.win/raw?url="+encodeURIComponent(BASE),               parse:false},
+    {url:"https://corsproxy.io/?"+encodeURIComponent(BASE),                            parse:false},
+    {url:"https://api.codetabs.com/v1/proxy?quest="+encodeURIComponent(BASE),          parse:false},
   ];
 
   let fetched = false;
   for(let i=0; i<PROXIES.length; i++){
     try {
       const data = await tryProxy(PROXIES[i].url, PROXIES[i].parse);
+      console.log("Proxy "+(i+1)+" response:", JSON.stringify(data).slice(0,100));
       if(data && data.rates && Object.keys(data.rates).length > 0){
         applyRates(data.rates);
         liveStatus = "success";
