@@ -63,8 +63,9 @@
 // ============================================================
 // CONFIGURATION
 // ============================================================
-const METALS_API_KEY = "7b7583ff5e740672d8e7c668dcec8e5a";
-const METALS_API_DIRECT = "https://api.metalpriceapi.com/v1/latest?api_key=" + METALS_API_KEY + "&base=INR&currencies=XAU,XAG,XCU,XPT";
+const METALS_API_KEY   = "7b7583ff5e740672d8e7c668dcec8e5a"; // MetalPriceAPI — Gold/Silver/Platinum
+const METALS_DEV_KEY   = "3RN0PV5IZ9YVR7FCZTRD245FCZTRD";    // metals.dev — Copper + backup
+const METALS_API_DIRECT = "https://api.metalpriceapi.com/v1/latest?api_key=" + METALS_API_KEY + "&base=INR&currencies=XAU,XAG,XPT";
 const METALS_API_URL = "https://corsproxy.io/?" + encodeURIComponent(METALS_API_DIRECT);
 
 // ============================================================
@@ -197,39 +198,70 @@ function chgBadge(v){
 // LIVE DATA — 6 proxy attempts then intelligent simulation
 // NEVER shows "Failed to fetch" — always shows a price
 // ============================================================
+// DUAL-SOURCE LIVE DATA ENGINE
+// Source A: MetalPriceAPI — Gold/Silver/Platinum (INR base)
+// Source B: metals.dev    — All 4 metals including Copper (INR)
+// Strategy: Try A first → fallback to B → cross-validate → simulate if both fail
+// ============================================================
+
+// Tracks which source each metal came from
+let dataSource = {}; // { Gold: "MetalPriceAPI", Silver: "metals.dev", ... }
+let crossCheck  = {}; // { Gold: {a: 141774, b: 141820, diff: 0.03%}, ... }
+
 function applyRates(rates){
   if(rates.INRXAU) liveData.Gold     = (1/rates.INRXAU) * (10/31.1035);
   if(rates.INRXAG) liveData.Silver   = (1/rates.INRXAG) * (1000/31.1035);
-  if(rates.INRXCU) liveData.Copper   = (1/rates.INRXCU) / 0.453592;
   if(rates.INRXPT) liveData.Platinum = (1/rates.INRXPT) * (10/31.1035);
-  // Save prices for day-over-day change tracking
+  if(rates.INRXAU) dataSource.Gold     = "MetalPriceAPI";
+  if(rates.INRXAG) dataSource.Silver   = "MetalPriceAPI";
+  if(rates.INRXPT) dataSource.Platinum = "MetalPriceAPI";
   saveTodayPrices();
 }
 
-function applyUSDRates(rates, usdInr){
-  // rates keyed as USDXAU etc, convert to INR
-  const r = usdInr || 86.5;
-  if(rates.USDXAU) liveData.Gold     = (1/rates.USDXAU) * r * (10/31.1035);
-  if(rates.USDXAG) liveData.Silver   = (1/rates.USDXAG) * r * (1000/31.1035);
-  if(rates.USDXCU) liveData.Copper   = (1/rates.USDXCU) * r / 0.453592;
-  if(rates.USDXPT) liveData.Platinum = (1/rates.USDXPT) * r * (10/31.1035);
+// ── Parse metals.dev response → INR prices ────────────────────
+function applyMetalsDev(data){
+  // metals.dev returns toz prices in chosen currency
+  // Gold/Platinum: toz → per 10g = × (10/31.1035)
+  // Silver: toz → per kg = × (1000/31.1035)
+  // Copper: per mt in INR → per kg = ÷ 1000
+  const m = data.metals;
+  const applied = {};
+  if(m?.gold)     { applied.Gold     = m.gold     * (10/31.1035);   }
+  if(m?.silver)   { applied.Silver   = m.silver   * (1000/31.1035); }
+  if(m?.platinum) { applied.Platinum = m.platinum * (10/31.1035);   }
+  if(m?.copper)   { applied.Copper   = m.copper   / 1000;           }
+  else if(m?.lme_copper){ applied.Copper = m.lme_copper / 1000;     }
+  return applied;
+}
+
+// ── Cross-validate two price sources ─────────────────────────
+function crossValidate(pricesA, pricesB){
+  const result = {};
+  const THRESHOLD = 0.5; // >0.5% diff = flag as warning
+  metalKeys.forEach(k=>{
+    const a = pricesA[k], b = pricesB[k];
+    if(a && b){
+      const diff = Math.abs(a-b)/a*100;
+      const ok   = diff < THRESHOLD;
+      result[k]  = { a: a.toFixed(2), b: b.toFixed(2), diff: diff.toFixed(3), ok };
+      if(!ok) console.warn(`⚠ ${k} cross-check MISMATCH: MetalPriceAPI=₹${a.toFixed(0)} vs metals.dev=₹${b.toFixed(0)} (${diff.toFixed(2)}% diff)`);
+      else    console.log(`✅ ${k} cross-check OK: ${diff.toFixed(3)}% diff between sources`);
+    }
+  });
+  crossCheck = result;
 }
 
 function smartSimulate(){
-  // Only simulate ONCE — never change again unless manually refreshed
-  // This prevents random number changes on auto-refresh
   if(liveStatus === "simulated" && Object.keys(liveData).length > 0){
-    // Already simulated — keep the same numbers, just update timestamp
-    lastUpdated = new Date();
-    return;
+    lastUpdated = new Date(); return;
   }
-  // First time only — generate small realistic movement from Yahoo base
   const drift = {Gold:0.0006, Silver:0.0009, Copper:0.0012, Platinum:0.0008};
   const hour = new Date().getHours();
-  const volatility = (hour >= 9 && hour <= 17) ? 1.2 : 0.7;
+  const vol = (hour >= 9 && hour <= 17) ? 1.2 : 0.7;
   metalKeys.forEach(k => {
-    const move = (Math.random()*2 - 1) * drift[k] * volatility;
-    liveData[k] = METALS[k].yahoo_inr * (1 + move);
+    const move = (Math.random()*2-1)*drift[k]*vol;
+    liveData[k] = METALS[k].yahoo_inr*(1+move);
+    dataSource[k] = "Simulated";
   });
   liveStatus = "simulated";
   lastUpdated = new Date();
@@ -237,73 +269,133 @@ function smartSimulate(){
 
 async function tryProxy(url, parseContents){
   const controller = new AbortController();
-  const timer = setTimeout(()=>controller.abort(), 6000); // 6s timeout
-  try {
+  const timer = setTimeout(()=>controller.abort(), 7000);
+  try{
     const res = await fetch(url, {signal: controller.signal});
     clearTimeout(timer);
     if(!res.ok) throw new Error("HTTP "+res.status);
     let data = await res.json();
-    if(parseContents && data && data.contents) data = JSON.parse(data.contents);
+    if(parseContents && data?.contents) data = JSON.parse(data.contents);
     return data;
-  } catch(e){
-    clearTimeout(timer);
-    throw e;
+  }catch(e){ clearTimeout(timer); throw e; }
+}
+
+// ── Fetch from metals.dev (Source B) ─────────────────────────
+async function fetchMetalsDev(){
+  const BASE = `https://api.metals.dev/v1/latest?api_key=${METALS_DEV_KEY}&currency=INR&unit=toz`;
+  const PROXIES = [
+    {url:"https://api.allorigins.win/get?url="+encodeURIComponent(BASE), parse:true},
+    {url:"https://corsproxy.io/?"+encodeURIComponent(BASE),              parse:false},
+    {url:"https://api.codetabs.com/v1/proxy?quest="+encodeURIComponent(BASE), parse:false},
+  ];
+  for(const p of PROXIES){
+    try{
+      const data = await tryProxy(p.url, p.parse);
+      if(data?.metals){
+        const prices = applyMetalsDev(data);
+        if(Object.keys(prices).length > 0){
+          console.log("metals.dev response:", JSON.stringify(prices).slice(0,120));
+          return prices;
+        }
+      }
+    }catch(e){ console.log("metals.dev proxy failed:", e.message); }
   }
+  return null;
+}
+
+// ── Fetch from MetalPriceAPI (Source A) ──────────────────────
+async function fetchMetalPriceAPI(){
+  const KEY  = METALS_API_KEY;
+  const BASE = "https://api.metalpriceapi.com/v1/latest?api_key="+KEY+"&base=INR&currencies=XAU,XAG,XPT";
+  const PROXIES = [
+    {url:"https://api.allorigins.win/get?url="+encodeURIComponent(BASE), parse:true},
+    {url:"https://corsproxy.io/?"+encodeURIComponent(BASE),              parse:false},
+    {url:"https://api.codetabs.com/v1/proxy?quest="+encodeURIComponent(BASE), parse:false},
+  ];
+  for(let i=0; i<PROXIES.length; i++){
+    try{
+      const data = await tryProxy(PROXIES[i].url, PROXIES[i].parse);
+      console.log("MetalPriceAPI proxy "+(i+1)+" response:", JSON.stringify(data).slice(0,100));
+      if(data?.rates && Object.keys(data.rates).length > 0){
+        const prices = {};
+        if(data.rates.INRXAU) prices.Gold     = (1/data.rates.INRXAU)*(10/31.1035);
+        if(data.rates.INRXAG) prices.Silver   = (1/data.rates.INRXAG)*(1000/31.1035);
+        if(data.rates.INRXPT) prices.Platinum = (1/data.rates.INRXPT)*(10/31.1035);
+        if(Object.keys(prices).length > 0) return prices;
+      }
+    }catch(e){ console.log("MetalPriceAPI proxy "+(i+1)+" failed:", e.message); }
+  }
+  return null;
 }
 
 async function fetchLiveData(){
-  liveStatus="loading";updateLiveIndicator();
+  liveStatus="loading"; updateLiveIndicator();
 
-  // Track API usage — save to localStorage
+  // Track API usage
   try{
-    const today = new Date().toISOString().slice(0,7); // YYYY-MM
-    const usage = JSON.parse(localStorage.getItem("api_usage")||"{}");
+    const today=new Date().toISOString().slice(0,7);
+    const usage=JSON.parse(localStorage.getItem("api_usage")||"{}");
     if(!usage[today]) usage[today]=0;
     usage[today]++;
-    localStorage.setItem("api_usage", JSON.stringify(usage));
+    localStorage.setItem("api_usage",JSON.stringify(usage));
     updateApiCounter(usage[today]);
   }catch(e){}
 
-  const KEY=METALS_API_KEY;
-  const BASE = "https://api.metalpriceapi.com/v1/latest?api_key="+KEY+"&base=INR&currencies=XAU,XAG,XCU,XPT";
-  const PROXIES = [
-    {url:"https://api.allorigins.win/get?url="+encodeURIComponent(BASE),               parse:true},
-    {url:"https://api.allorigins.win/raw?url="+encodeURIComponent(BASE),               parse:false},
-    {url:"https://corsproxy.io/?"+encodeURIComponent(BASE),                            parse:false},
-    {url:"https://api.codetabs.com/v1/proxy?quest="+encodeURIComponent(BASE),          parse:false},
-  ];
+  // ── Fetch both sources in parallel ───────────────────────────
+  const [pricesA, pricesB] = await Promise.allSettled([
+    fetchMetalPriceAPI(),
+    fetchMetalsDev()
+  ]).then(r => r.map(p => p.status==="fulfilled" ? p.value : null));
 
-  let fetched = false;
-  for(let i=0; i<PROXIES.length; i++){
-    try {
-      const data = await tryProxy(PROXIES[i].url, PROXIES[i].parse);
-      console.log("Proxy "+(i+1)+" response:", JSON.stringify(data).slice(0,100));
-      if(data && data.rates && Object.keys(data.rates).length > 0){
-        applyRates(data.rates);
-        liveStatus = "success";
-        lastUpdated = new Date();
-        fetched = true;
-        console.log("Live data fetched via proxy "+(i+1));
-        break;
-      }
-    } catch(e){
-      console.log("Proxy "+(i+1)+" failed:", e.message);
-    }
-  }
+  console.log("Source A (MetalPriceAPI):", pricesA ? "✅ success" : "❌ failed");
+  console.log("Source B (metals.dev):   ", pricesB ? "✅ success" : "❌ failed");
 
-  // All proxies failed — use intelligent market simulation
-  // This ALWAYS works and looks identical for demo purposes
-  if(!fetched){
+  if(pricesA && pricesB){
+    // BOTH sources available — cross-validate then merge
+    crossValidate(pricesA, pricesB);
+    // Use average of both for Gold/Silver/Platinum (more accurate)
+    metalKeys.forEach(k=>{
+      const a = pricesA[k], b = pricesB[k];
+      if(a && b){
+        // If diff < 1% use average, else prefer Source A (INR-based)
+        const diff = Math.abs(a-b)/a*100;
+        liveData[k]   = diff < 1.0 ? (a+b)/2 : a;
+        dataSource[k] = diff < 1.0 ? "Avg(MetalPriceAPI+metals.dev)" : "MetalPriceAPI";
+      } else if(a){ liveData[k]=a; dataSource[k]="MetalPriceAPI"; }
+        else if(b){ liveData[k]=b; dataSource[k]="metals.dev"; }
+    });
+    // Copper only from metals.dev (MetalPriceAPI blocks it)
+    if(pricesB.Copper){ liveData.Copper=pricesB.Copper; dataSource.Copper="metals.dev"; }
+    liveStatus="success"; lastUpdated=new Date();
+
+  } else if(pricesA){
+    // Only Source A — use it, simulate Copper
+    Object.assign(liveData, pricesA);
+    metalKeys.filter(k=>pricesA[k]).forEach(k=>dataSource[k]="MetalPriceAPI");
+    if(pricesB?.Copper){ liveData.Copper=pricesB.Copper; dataSource.Copper="metals.dev"; }
+    else{ liveData.Copper=METALS.Copper.yahoo_inr*(1+(Math.random()*2-1)*0.0008); dataSource.Copper="Simulated(MCX base)"; }
+    liveStatus="success"; lastUpdated=new Date();
+    console.log("⚠ metals.dev unavailable — using MetalPriceAPI only, Copper simulated");
+
+  } else if(pricesB){
+    // Only Source B — use metals.dev for everything
+    const prices = pricesB;
+    Object.keys(prices).forEach(k=>{ liveData[k]=prices[k]; dataSource[k]="metals.dev(fallback)"; });
+    liveStatus="success"; lastUpdated=new Date();
+    console.log("⚠ MetalPriceAPI unavailable — using metals.dev as fallback for all metals");
+
+  } else {
+    // Both failed — simulate
     smartSimulate();
-    console.log("Using smart market simulation (demo mode)");
+    metalKeys.forEach(k=>dataSource[k]="Simulated");
+    console.log("❌ Both APIs failed — using smart simulation");
   }
 
+  saveTodayPrices();
   updateLiveIndicator();
-  // Re-render full app so hero price, charts, IBJA, portfolio ALL reflect live data
   renderApp();
-  // If on a tab with a chart, re-render the chart too
-  if(activeTab==="Chart") setTimeout(renderChart, 80);
-  if(activeTab==="Portfolio") setTimeout(renderPfChart, 80);
+  if(activeTab==="Chart")     setTimeout(renderChart,80);
+  if(activeTab==="Portfolio") setTimeout(renderPfChart,80);
 }
 
 function updateLiveIndicator(){
@@ -561,10 +653,10 @@ function buildCompare(){
       </div>
       ${compTable}
       <div style="margin-top:12px;font-size:9px;color:#555;line-height:1.7">
-        <span style="color:#7B61FF">AI BASE</span>: Last known price from Colab training — updated manually each day using goodreturns.in/nagpur &nbsp;·&nbsp;
-        <span style="color:#00C9A7">${isSimulated?"SIMULATED":"LIVE"}</span>: MetalPriceAPI real-time spot (auto-fetches on load, live on GitHub Pages) &nbsp;·&nbsp;
+        <span style="color:#7B61FF">AI BASE</span>: Last known price from Colab training — updated manually each day &nbsp;·&nbsp;
+        <span style="color:#00C9A7">${isSimulated?"SIMULATED":"LIVE"}</span>: MetalPriceAPI — Gold/Silver/Platinum live · <span style="color:#CD7F32">Copper simulated</span> (XCU needs paid plan) &nbsp;·&nbsp;
         <span style="color:#FF9933">IBJA</span>: Live × 1.06 import duty, pre-GST — verified ±₹100 vs goodreturns.in/nagpur
-        ${isSimulated?'<br/><span style="color:#F4C542">⚠ Showing simulation — deploys as LIVE on GitHub Pages (HTTPS required for API)</span>':""}
+        ${isSimulated?'<br/><span style="color:#F4C542">⚠ Proxies blocked — try refreshing. Gold/Silver/Platinum go LIVE when proxy connects.</span>':""}
       </div>
     </div>
   </div>`;
@@ -1661,29 +1753,34 @@ function buildForecast(){
     ["Degree","B.Sc Artificial Intelligence"],
     ["Semester","6th Semester, Nagpur"],
     // Model
-    ["Model v2","Multivariate BiLSTM + Attention"],
-    ["Architecture","BiDirectional LSTM (128→64) + MultiHead Attention (4 heads) + LayerNorm"],
+    ["Model","BiLSTM + MultiHead Attention v2"],
+    ["Architecture","BiDirectional LSTM (128→64) + Attention (4 heads) + LayerNorm"],
     ["Framework","TensorFlow 2.x + Keras"],
     ["Training Data","2015–2026 (11 years, Yahoo Finance)"],
     ["Data Points","2,750 days × 37 features = 1,01,750 total"],
     ["Features","12/day: 4 metals + USD/INR + RSI-14 + MACD + Bollinger %B + MA-7 + MA-30 + Δ% + Volatility"],
-    ["Target","% price change (not raw price — key fix)"],
+    ["Target","% price change (not raw price)"],
     ["Uncertainty","Monte Carlo Dropout · 50 forward passes"],
     ["Forecast","30 trading days + 90%/50% confidence bands"],
-    // Accuracy
+    // Real Accuracy
     ["Gold Accuracy","99.04%  ·  MAE ₹912  ·  RMSE ₹1,539"],
     ["Silver Accuracy","97.67%  ·  MAE ₹3,310  ·  RMSE ₹7,196"],
     ["Copper Accuracy","98.67%  ·  MAE ₹12  ·  RMSE ₹20"],
     ["Platinum Accuracy","98.08%  ·  MAE ₹795  ·  RMSE ₹1,508"],
-    // Data sources
-    ["Source 1","Yahoo Finance (yfinance) — historical"],
-    ["Source 2","MetalPriceAPI — live prices"],
-    ["Source 3","IBJA India — official market rates"],
-    ["IBJA Formula","Yahoo × 1.06 (import duty only, pre-GST)"],
+    // Dual-source live data
+    ["Source A","MetalPriceAPI — Gold/Silver/Platinum (INR base, free tier)"],
+    ["Source B","metals.dev — All 4 metals incl. Copper/LME (INR, free tier)"],
+    ["Source C","IBJA India — Official India rates (Yahoo × 1.06, pre-GST)"],
+    ["Fallback","Both APIs fetched in parallel · automatic failover · simulation if both fail"],
+    ["Cross-Validation","Prices compared across both APIs · avg used if diff < 1% · flagged if > 0.5%"],
     // Dashboard
-    ["Dashboard","v10 — 5 tabs: Compare · Chart · Forecast · Portfolio · India"],
-    ["Portfolio","IBJA-based · Carat/purity · P&L · 30-day AI forecast"],
-    ["Chart","6 ranges: 1D · 7D · 1M · 3M · 1Y · 10Y + crosshair cursor"],
+    ["Dashboard","v10 — 6 tabs: Compare · Chart · Forecast · Portfolio · Technical · India"],
+    ["Auto-Calc","RSI-14 · MACD · Bollinger %B · XAI drivers · Forecasts — all live computed"],
+    ["Portfolio","IBJA-based · Carat/purity · P&L · Sharpe Ratio · 30-day AI forecast"],
+    ["XAI","Real BiLSTM attention weights + SHAP-style feature attribution"],
+    ["Correlation","6-asset Pearson matrix: Gold · Silver · Copper · Platinum · USD/INR · NIFTY 50"],
+    ["API Quota","100 req/month MetalPriceAPI + 100 req/month metals.dev = 200 total free"],
+    ["Deployed","GitHub Pages — https://vinit2812.github.io/metals-oracle/"],
     ["Location","Nagpur, Maharashtra, India"],
   ].map(([l,v])=>`
     <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px solid #2E355055;font-size:11px;gap:12px">
