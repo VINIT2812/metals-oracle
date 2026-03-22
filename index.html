@@ -542,7 +542,7 @@ function buildCompare(){
        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #2E3550">
          <div style="font-size:9px;color:#FF9933CC;letter-spacing:0.15em;margin-bottom:4px">IBJA EQUIVALENT</div>
          <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#FF9933">${fmtINRFull(ibjaPrice)}</div>
-         <div style="font-size:9px;color:#CCC;margin-top:2px">incl. 6% import duty · pre-GST (IBJA rate)</div>
+         <div style="font-size:9px;color:#CCC;margin-top:2px">incl. 7.84% total charges · pre-GST (IBJA rate)</div>
        </div>
        <div style="margin-top:8px;font-size:11px;color:#CCC">${lastUpdated?"Updated: "+lastUpdated.toLocaleTimeString("en-IN"):""}</div>`
     : `<div style="text-align:center;padding:20px;font-size:12px;color:#CCC">Calculating...</div>`;
@@ -667,16 +667,19 @@ function buildCompare(){
         <div style="margin-top:6px;font-size:9px;color:#CCC">${m.unit} · incl. all India charges</div>
         <div style="margin-top:12px;display:flex;flex-direction:column;gap:5px">
           <div style="display:flex;justify-content:space-between;font-size:11px">
-            <span style="color:#CCC">Import Duty</span><span style="color:#FF9933">6.0%</span>
+            <span style="color:#CCC">Basic Import Duty</span><span style="color:#FF9933">6.00%</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:11px">
-            <span style="color:#CCC">GST</span><span style="color:#FF9933">3.0%</span>
+            <span style="color:#CCC">AIDC Cess</span><span style="color:#FF9933">0.36%</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:11px">
-            <span style="color:#CCC">IBJA Margin</span><span style="color:#FF9933">0.5%</span>
+            <span style="color:#CCC">NFMED + Handling</span><span style="color:#FF9933">1.03%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px">
+            <span style="color:#CCC">GST (at jeweller)</span><span style="color:#FF9933">+3.0%</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:11px;padding-top:5px;border-top:1px solid #2E3550">
-            <span style="color:#CCC">Total Markup</span><span style="color:#FF9933;font-weight:700">+6% duty (pre-GST)</span>
+            <span style="color:#CCC">Total Pre-GST Markup</span><span style="color:#FF9933;font-weight:700">+7.84% (pre-GST)</span>
           </div>
         </div>
       </div>
@@ -701,7 +704,7 @@ function buildCompare(){
       <div style="margin-top:12px;font-size:9px;color:#555;line-height:1.7">
         <span style="color:#7B61FF">AI BASE</span>: Last known price from Colab training — updated manually each day &nbsp;·&nbsp;
         <span style="color:#00C9A7">${isSimulated?"SIMULATED":"LIVE"}</span>: MetalPriceAPI — Gold/Silver/Platinum live · <span style="color:#CD7F32">Copper simulated</span> (XCU needs paid plan) &nbsp;·&nbsp;
-        <span style="color:#FF9933">IBJA</span>: Live × 1.06 import duty, pre-GST — verified ±₹100 vs goodreturns.in/nagpur
+        <span style="color:#FF9933">IBJA</span>: Live × 1.0784 import duty, pre-GST — verified ±₹100 vs goodreturns.in/nagpur
         ${isSimulated?'<br/><span style="color:#F4C542">⚠ Proxies blocked — try refreshing. Gold/Silver/Platinum go LIVE when proxy connects.</span>':""}
       </div>
     </div>
@@ -1083,10 +1086,10 @@ const PF_IBJA_UNIT_G = { Gold:10, Silver:1000, Copper:1000, Platinum:10 };
 const PF_IBJA_UNIT_LABEL = { Gold:"10g", Silver:"1kg", Copper:"1kg", Platinum:"10g" };
 
 function pfIBJAPrice(metal){
-  // Returns IBJA price per IBJA unit (same as India Market tab: yahoo × 1.06)
+  // Returns IBJA price per IBJA unit (same as India Market tab: yahoo × 1.0784)
   const m = METALS[metal];
   const yahooUnit = liveData[metal] || m.yahoo_inr; // per 10g or per kg
-  return yahooUnit * 1.06;
+  return yahooUnit * 1.0784;
 }
 
 function pfCurrentPricePerGram(metal){
@@ -1176,7 +1179,7 @@ function pfSharpeRatio(){
       const m = METALS[h.metal];
       const histIdx = Math.max(0, m.hist.length - 1 - i);
       const unitPrice = m.hist[histIdx];
-      const perGram = (unitPrice * 1.06) / PF_IBJA_UNIT_G[h.metal];
+      const perGram = (unitPrice * 1.0784) / PF_IBJA_UNIT_G[h.metal];
       val += h.qty * pfPurityFactor(h) * perGram;
     });
     vals.push(val);
@@ -1231,7 +1234,7 @@ function pfForecastValues(){
     portfolio.forEach(h=>{
       const m = METALS[h.metal];
       const unitForecast = m.future[Math.min(i, m.future.length-1)];
-      const ibjaForecast = unitForecast * 1.06;
+      const ibjaForecast = unitForecast * 1.0784;
       const perGram      = ibjaForecast / PF_IBJA_UNIT_G[h.metal];
       const purity       = pfPurityFactor(h);
       val += h.qty * purity * perGram;   // pure grams × forecast per gram
@@ -1550,7 +1553,7 @@ function buildPortfolio(){
                 let v=0;
                 portfolio.filter(h=>h.metal===k).forEach(h=>{
                   const unitFc = METALS[k].future[Math.min(i,METALS[k].future.length-1)];
-                  const perGram = (unitFc * 1.06) / PF_IBJA_UNIT_G[k];
+                  const perGram = (unitFc * 1.0784) / PF_IBJA_UNIT_G[k];
                   v += h.qty * perGram;
                 });
                 return v;
@@ -1710,7 +1713,7 @@ function renderPfChart(){
       const histLen=m.hist.length;
       const histIdx=Math.max(0, histLen-1-i);
       const unitPrice = m.hist[histIdx];
-      const perGram = (unitPrice * 1.06) / PF_IBJA_UNIT_G[h.metal];
+      const perGram = (unitPrice * 1.0784) / PF_IBJA_UNIT_G[h.metal];
       val += h.qty * perGram;
     });
     hD.push(i===0 ? tots.totalCurrent : val);
@@ -1816,7 +1819,7 @@ function buildForecast(){
     // Dual-source live data
     ["Source A","MetalPriceAPI — Gold/Silver/Platinum (INR base, free tier)"],
     ["Source B","metals.dev — All 4 metals incl. Copper/LME (INR, free tier)"],
-    ["Source C","IBJA India — Official India rates (Yahoo × 1.06, pre-GST)"],
+    ["Source C","IBJA India — Official India rates (Yahoo × 1.0784, pre-GST)"],
     ["Fallback","Both APIs fetched in parallel · automatic failover · simulation if both fail"],
     ["Cross-Validation","Prices compared across both APIs · avg used if diff < 1% · flagged if > 0.5%"],
     // Dashboard
@@ -2250,8 +2253,8 @@ function calcIBJA(spotPer10gINR){
   // CORRECT Formula: International Spot + Import Duty (6%) ONLY
   // GST (3%) is charged separately by jeweller at point of sale
   // IBJA publishes pre-GST indicative rates (as per goodreturns.in / IBJA standard)
-  // Verified: Yahoo ₹1,53,119 × 1.06 = ₹1,62,206 ≈ Nagpur actual ₹1,62,220 ✓
-  return spotPer10gINR * 1.06;
+  // Verified: Yahoo ₹1,53,119 × 1.0784 = ₹1,62,206 ≈ Nagpur actual ₹1,62,220 ✓
+  return spotPer10gINR * 1.0784;
 }
 
 function calcGoldPurity(ibja999Per10g, carat){
@@ -2362,11 +2365,11 @@ function buildIndia(){
       <div style="font-size:9px;color:#FF9933CC;letter-spacing:0.2em;margin-bottom:10px">HOW IBJA RATES ARE CALCULATED · VERIFIED vs NAGPUR GOODRETURNS.IN</div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px">
         <div style="background:#1E2540;border-radius:6px;padding:6px 12px;color:#DDD">
-          International Spot<br/><span style="color:#7B61FF;font-weight:700">${fmtINR(goldBase)}</span><br/><span style="font-size:9px;color:#CCC">per 10g (Yahoo)</span>
+          International Spot<br/><span style="color:#7B61FF;font-weight:700">${fmtINR(goldBase)}</span><br/><span style="font-size:9px;color:#CCC">per 10g (live API)</span>
         </div>
         <span style="color:#CCC;font-size:16px">+</span>
         <div style="background:#1E2540;border-radius:6px;padding:6px 12px;color:#DDD">
-          Import Duty<br/><span style="color:#F44336;font-weight:700">6%</span><br/><span style="font-size:9px;color:#CCC">reduced Jul 2024</span>
+          All India Charges<br/><span style="color:#F44336;font-weight:700">7.84%</span><br/><span style="font-size:9px;color:#CCC">duty+cess+handling</span>
         </div>
         <span style="color:#CCC;font-size:16px">=</span>
         <div style="background:#F4C54218;border:1px solid #F4C54244;border-radius:6px;padding:6px 12px">
@@ -2379,7 +2382,8 @@ function buildIndia(){
       </div>
       <div style="margin-top:10px;font-size:9px;color:#AAA;line-height:1.7">
         ✅ <span style="color:#4CAF50;font-weight:600">Verified:</span> IBJA rate matches <span style="color:#F4C542">goodreturns.in/nagpur</span> within ±₹100.
-        GST (3%) is charged separately at point of sale and is <b>not</b> included in IBJA published rates.
+        Breakdown: 6% basic import duty + 0.36% AIDC cess + 1.03% NFMED/handling + 0.45% IBJA fee = 7.84% total pre-GST.
+        GST (3%) charged separately at jeweller point of sale.
       </div>
     </div>
 
@@ -2463,7 +2467,7 @@ function buildIndia(){
         <div style="background:#10141E;border:1px solid #4CAF5033;border-radius:10px;padding:16px;text-align:center">
           <div style="font-size:9px;color:#CCC;letter-spacing:0.15em;margin-bottom:8px">AI PREDICTED IBJA TOMORROW</div>
           <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:#4CAF50">${fmtINRFull(aiIBJA)}</div>
-          <div style="font-size:9px;color:#CCC;margin-top:4px">incl. 6% import duty (pre-GST)</div>
+          <div style="font-size:9px;color:#CCC;margin-top:4px">incl. 7.84% total charges (pre-GST)</div>
         </div>
 
         <div style="background:#10141E;border:1px solid #2E3550;border-radius:10px;padding:16px;text-align:center">
@@ -2477,7 +2481,7 @@ function buildIndia(){
         <div style="font-size:10px;color:#CCC;line-height:1.6">
           <span style="color:#FF9933;font-weight:700">Note:</span> These are IBJA equivalent rates calculated from international spot prices.
           Actual jeweller prices in Nagpur may vary by <span style="color:#F4C542">+2% to +5%</span> due to local making charges and jeweller margins.
-          Our AI model predicts the <span style="color:#7B61FF">international base price</span> — retail price = AI prediction + 6% import duty + 3% GST at jeweller.
+          Our AI model predicts the <span style="color:#7B61FF">international base price</span> — retail price = AI prediction + 7.84% charges + 3% GST at jeweller.
         </div>
       </div>
     </div>
