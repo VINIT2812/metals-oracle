@@ -73,22 +73,22 @@ const METALS_API_URL = "https://corsproxy.io/?" + encodeURIComponent(METALS_API_
 // ============================================================
 const METALS = {
   Gold:{
-    unit:"per 10g", yahoo_inr:141774, yahoo_usd:1549.62,
-    tomorrow_inr:141650, week_inr:141421, month_inr:141726,
-    change_1d:-0.292, change_7d:-2.739, change_30d:-0.03,
+    unit:"per 10g", yahoo_inr:137707.55, yahoo_usd:1505.80,
+    tomorrow_inr:137587, week_inr:137365, month_inr:137661,
+    change_1d:-1.974, change_7d:-4.10, change_30d:-0.03,
     color:"#F4C542", symbol:"Au", accuracy:99.04,
     apiSymbol:"XAU", troyOzTo10g: 10/31.1035,
-    hist:[138000,139200,140100,141500,142800,141900,143200,144500,143800,145100,146200,145800,147000,148200,147500,149000,150200,149800,151000,152300,151700,153000,152500,154000,153800,155200,154600,156000,155400,157000,156500,158000,157300,159000,158500,160000,159400,161000,160200,162500,161800,163200,162500,164000,163300,165000,164200,166000,165100,167000,166200,168000,167000,165000,163000,161000,159000,157000,155000,153000,152000,151594,148509,141774],
-    future:[141650,141560,141498,141457,141433,141422,141421,141426,141437,141452,141469,141488,141507,141527,141546,141565,141582,141599,141615,141630,141644,141657,141669,141679,141689,141698,141706,141713,141720,141726]
+    hist:[138000,139200,140100,141500,142800,141900,143200,144500,143800,145100,146200,145800,147000,148200,147500,149000,150200,149800,151000,152300,151700,153000,152500,154000,153800,155200,154600,156000,155400,157000,156500,158000,157300,159000,158500,160000,159400,161000,160200,162500,161800,163200,162500,164000,163300,165000,164200,166000,165100,167000,166200,168000,167000,165000,163000,161000,153038,151594,150623,150623,148509,149132,148821,141774,140481,137708],
+    future:[137587,137500,137439,137400,137376,137366,137365,137370,137380,137395,137411,137430,137448,137468,137486,137505,137521,137538,137553,137568,137581,137594,137606,137615,137625,137634,137642,137648,137655,137661]
   },
   Silver:{
-    unit:"per 1 Kg", yahoo_inr:245283, yahoo_usd:2681.00,
-    tomorrow_inr:248076, week_inr:253231, month_inr:246364,
-    change_1d:3.795, change_7d:3.24, change_30d:0.44,
+    unit:"per 1 Kg", yahoo_inr:231132.08, yahoo_usd:2527.00,
+    tomorrow_inr:233764, week_inr:238622, month_inr:232151,
+    change_1d:0.000, change_7d:-4.80, change_30d:-0.49,
     color:"#B0C4D8", symbol:"Ag", accuracy:97.67,
     apiSymbol:"XAG", troyOzTo10g: 1000/31.1035,
-    hist:[232000,234000,235000,236500,238000,237500,239000,240000,239000,241000,242500,241500,243000,244000,243500,245000,246000,245000,247000,246500,248000,247500,249000,248000,250000,249000,251000,250500,252000,251000,253000,252000,254000,253000,255000,254000,256000,255500,257000,256000,258000,257000,259000,258000,260000,273585,273585,264151,264057,259434,259434,254717,259434,250000,245283],
-    future:[248076,250090,251489,252405,252946,253198,253231,253101,252853,252522,252137,251719,251284,250845,250412,249992,249590,249208,248849,248514,248203,247916,247652,247411,247191,246991,246809,246645,246497,246364]
+    hist:[232000,234000,235000,236500,238000,237500,239000,240000,239000,241000,242500,241500,243000,244000,243500,245000,246000,245000,247000,246500,248000,247500,249000,248000,250000,249000,251000,250500,252000,251000,253000,252000,254000,253000,255000,254000,256000,255500,257000,256000,258000,257000,259000,258000,260000,264057,259434,259434,254717,259434,250000,245283,240566,231132,231132],
+    future:[233764,235662,236980,237843,238353,238590,238622,238499,238265,237953,237591,237197,236787,236373,235965,235569,235191,234831,234492,234177,233884,233613,233364,233137,232930,232742,232570,232416,232276,232151]
   },
   Copper:{
     unit:"per 1 Kg", yahoo_inr:1153, yahoo_usd:12.61,
@@ -100,13 +100,13 @@ const METALS = {
     future:[1153.87,1154.50,1154.94,1155.22,1155.39,1155.47,1155.48,1155.44,1155.36,1155.26,1155.14,1155.01,1154.87,1154.74,1154.60,1154.47,1154.34,1154.23,1154.11,1154.01,1153.91,1153.82,1153.74,1153.66,1153.60,1153.53,1153.48,1153.43,1153.38,1153.34]
   },
   Platinum:{
-    unit:"per 10g", yahoo_inr:57208, yahoo_usd:625.33,
-    tomorrow_inr:56625, week_inr:55550, month_inr:56982,
-    change_1d:-3.395, change_7d:-2.90, change_30d:-0.39,
+    unit:"per 10g", yahoo_inr:56811.32, yahoo_usd:621.00,
+    tomorrow_inr:56232, week_inr:55165, month_inr:56587,
+    change_1d:-0.693, change_7d:-2.90, change_30d:-0.39,
     color:"#8FAACC", symbol:"Pt", accuracy:98.08,
     apiSymbol:"XPT", troyOzTo10g: 10/31.1035,
-    hist:[57651,57651,57340,57462,57651,58236,55792,56660,56660,56491,57500,57800,58000,57600,57300,57100,57000,57208,57500,57600,57800,57900,58000,57800,57600,57500,57300,57100,57208],
-    future:[56625,56205,55913,55722,55609,55557,55550,55577,55629,55698,55778,55865,55956,56047,56138,56225,56309,56389,56464,56534,56599,56659,56714,56764,56810,56852,56890,56924,56955,56982]
+    hist:[57651,57651,57340,57462,57651,58236,55792,56660,56660,56491,57500,57800,58000,57600,57300,57100,57000,57208,57500,57600,57800,57900,58000,57800,57600,57500,57300,57100,56811],
+    future:[56232,55815,55525,55336,55223,55172,55165,55192,55243,55312,55391,55478,55568,55658,55749,55835,55919,55998,56072,56142,56207,56266,56321,56370,56416,56458,56496,56529,56560,56587]
   }
 };
 
@@ -137,20 +137,20 @@ function genHist(anchors, points, noise=0.012){
 // 1Y weekly (52 points) and 10Y monthly (120 points) for each metal
 const HIST_EXTENDED = {
   Gold:{
-    y1: genHist([{t:0,p:95000},{t:0.3,p:110000},{t:0.6,p:130000},{t:0.85,p:145000},{t:1,p:141774}], 52, 0.01),
-    y10:genHist([{t:0,p:26000},{t:0.15,p:29000},{t:0.3,p:32000},{t:0.4,p:38000},{t:0.5,p:55000},{t:0.6,p:47000},{t:0.7,p:52000},{t:0.8,p:62000},{t:0.9,p:95000},{t:1,p:141774}], 120, 0.015)
+    y1: genHist([{t:0,p:95000},{t:0.3,p:110000},{t:0.6,p:130000},{t:0.85,p:145000},{t:1,p:137708}], 52, 0.01),
+    y10:genHist([{t:0,p:26000},{t:0.15,p:29000},{t:0.3,p:32000},{t:0.4,p:38000},{t:0.5,p:55000},{t:0.6,p:47000},{t:0.7,p:52000},{t:0.8,p:62000},{t:0.9,p:95000},{t:1,p:137708}], 120, 0.015)
   },
   Silver:{
-    y1: genHist([{t:0,p:220000},{t:0.25,p:240000},{t:0.5,p:265000},{t:0.75,p:270000},{t:1,p:245283}], 52, 0.015),
-    y10:genHist([{t:0,p:40000},{t:0.15,p:38000},{t:0.3,p:42000},{t:0.4,p:44000},{t:0.5,p:70000},{t:0.6,p:55000},{t:0.7,p:65000},{t:0.8,p:80000},{t:0.9,p:150000},{t:1,p:245283}], 120, 0.02)
+    y1: genHist([{t:0,p:220000},{t:0.25,p:240000},{t:0.5,p:265000},{t:0.75,p:270000},{t:1,p:231132}], 52, 0.015),
+    y10:genHist([{t:0,p:40000},{t:0.15,p:38000},{t:0.3,p:42000},{t:0.4,p:44000},{t:0.5,p:70000},{t:0.6,p:55000},{t:0.7,p:65000},{t:0.8,p:80000},{t:0.9,p:150000},{t:1,p:231132}], 120, 0.02)
   },
   Copper:{
     y1: genHist([{t:0,p:1050},{t:0.3,p:1100},{t:0.6,p:1220},{t:0.85,p:1200},{t:1,p:1153}], 52, 0.012),
     y10:genHist([{t:0,p:380},{t:0.15,p:400},{t:0.3,p:450},{t:0.4,p:480},{t:0.5,p:620},{t:0.6,p:680},{t:0.7,p:780},{t:0.8,p:900},{t:0.9,p:1050},{t:1,p:1153}], 120, 0.018)
   },
   Platinum:{
-    y1: genHist([{t:0,p:62000},{t:0.25,p:61000},{t:0.5,p:60000},{t:0.75,p:59000},{t:1,p:57208}], 52, 0.01),
-    y10:genHist([{t:0,p:90000},{t:0.15,p:85000},{t:0.3,p:75000},{t:0.4,p:65000},{t:0.5,p:62000},{t:0.6,p:55000},{t:0.7,p:58000},{t:0.8,p:65000},{t:0.9,p:63000},{t:1,p:57208}], 120, 0.015)
+    y1: genHist([{t:0,p:62000},{t:0.25,p:61000},{t:0.5,p:60000},{t:0.75,p:59000},{t:1,p:56811}], 52, 0.01),
+    y10:genHist([{t:0,p:90000},{t:0.15,p:85000},{t:0.3,p:75000},{t:0.4,p:65000},{t:0.5,p:62000},{t:0.6,p:55000},{t:0.7,p:58000},{t:0.8,p:65000},{t:0.9,p:63000},{t:1,p:56811}], 120, 0.015)
   }
 };
 
@@ -221,16 +221,44 @@ function applyRates(rates){
 
 // ── Parse metals.dev response → INR prices ────────────────────
 function applyMetalsDev(data){
-  // metals.dev with unit=mt returns INR per metric tonne
-  // Gold/Platinum: mt → per 10g = ÷ 100,000
-  // Silver/Copper: mt → per kg  = ÷ 1,000
+  // metals.dev with unit=mt, currency=INR → INR per metric tonne
+  // Gold/Platinum: per 10g = value / 100,000
+  // Silver/Copper: per kg  = value / 1,000
   const m = data.metals;
   const applied = {};
-  if(m?.gold)      { applied.Gold     = m.gold / 100000;     } // INR/mt → INR/10g
-  if(m?.silver)    { applied.Silver   = m.silver / 1000;     } // INR/mt → INR/kg
-  if(m?.platinum)  { applied.Platinum = m.platinum / 100000; } // INR/mt → INR/10g
-  if(m?.copper)    { applied.Copper   = m.copper / 1000;     } // INR/mt → INR/kg
-  else if(m?.lme_copper){ applied.Copper = m.lme_copper/1000;}
+  const ok = (v, min, max) => typeof v==="number" && v>=min && v<=max;
+
+  if(m?.gold){
+    let v = m.gold / 100000;
+    // Sanity: Gold per 10g should be 80,000–300,000 INR
+    if(!ok(v,80000,300000)){ console.warn("metals.dev Gold /100000 =",v,"— trying /1000"); v=m.gold/1000; }
+    if(ok(v,80000,300000)) applied.Gold = v;
+    else console.warn("metals.dev Gold out of range:", m.gold);
+  }
+  if(m?.silver){
+    let v = m.silver / 1000;
+    // Silver per kg should be 80,000–600,000 INR
+    if(!ok(v,80000,600000)){ console.warn("metals.dev Silver /1000 =",v,"— trying /100"); v=m.silver/100; }
+    if(ok(v,80000,600000)) applied.Silver = v;
+    else console.warn("metals.dev Silver out of range:", m.silver);
+  }
+  if(m?.platinum){
+    let v = m.platinum / 100000;
+    // Platinum per 10g should be 30,000–200,000 INR
+    if(!ok(v,30000,200000)){ console.warn("metals.dev Pt /100000 =",v,"— trying /1000"); v=m.platinum/1000; }
+    if(ok(v,30000,200000)) applied.Platinum = v;
+    else console.warn("metals.dev Platinum out of range:", m.platinum);
+  }
+  const cu = m?.copper || m?.lme_copper;
+  if(cu){
+    let v = cu / 1000;
+    // Copper per kg should be 500–5,000 INR
+    if(!ok(v,500,5000)){ console.warn("metals.dev Cu /1000 =",v,"— trying /10000"); v=cu/10000; }
+    if(ok(v,500,5000)) applied.Copper = v;
+    else console.warn("metals.dev Copper out of range:", cu);
+  }
+  console.log("metals.dev raw gold:", m?.gold, "→ per 10g:", applied.Gold?.toFixed(0));
+  console.log("metals.dev parsed:", JSON.stringify(Object.fromEntries(Object.entries(applied).map(([k,v])=>[k,v?.toFixed(0)]))));
   return applied;
 }
 
@@ -318,10 +346,27 @@ async function fetchMetalPriceAPI(){
       console.log("MetalPriceAPI proxy "+(i+1)+" response:", JSON.stringify(data).slice(0,100));
       if(data?.rates && Object.keys(data.rates).length > 0){
         const prices = {};
-        // MetalPriceAPI base=INR: INRXAU = INR per 0.1 troy oz, INRXAG = INR per troy oz
-        if(data.rates.INRXAU) prices.Gold     = data.rates.INRXAU * (100/31.1035);   // per 10g
-        if(data.rates.INRXAG) prices.Silver   = data.rates.INRXAG * (1000/31.1035);  // per kg
-        if(data.rates.INRXPT) prices.Platinum = data.rates.INRXPT * (100/31.1035);   // per 10g
+        // MetalPriceAPI base=INR: rate × (100/31.1035) for Gold/Platinum per 10g
+        // rate × (1000/31.1035) for Silver per kg
+        if(data.rates.INRXAU){
+          const v = data.rates.INRXAU * (100/31.1035);
+          // Sanity: Gold per 10g = 80,000–300,000 INR
+          prices.Gold = (v>=80000&&v<=300000) ? v : null;
+          if(!prices.Gold) console.warn("MetalPriceAPI Gold out of range:", v, "raw rate:", data.rates.INRXAU);
+        }
+        if(data.rates.INRXAG){
+          const v = data.rates.INRXAG * (1000/31.1035);
+          prices.Silver = (v>=80000&&v<=600000) ? v : null;
+          if(!prices.Silver) console.warn("MetalPriceAPI Silver out of range:", v);
+        }
+        if(data.rates.INRXPT){
+          const v = data.rates.INRXPT * (100/31.1035);
+          prices.Platinum = (v>=30000&&v<=200000) ? v : null;
+          if(!prices.Platinum) console.warn("MetalPriceAPI Platinum out of range:", v);
+        }
+        // Remove nulls
+        Object.keys(prices).forEach(k=>{ if(!prices[k]) delete prices[k]; });
+        console.log("MetalPriceAPI parsed:", JSON.stringify(Object.fromEntries(Object.entries(prices).map(([k,v])=>[k,v?.toFixed(0)]))));
         if(Object.keys(prices).length > 0) return prices;
       }
     }catch(e){ console.log("MetalPriceAPI proxy "+(i+1)+" failed:", e.message); }
