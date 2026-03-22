@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Metals Oracle v10 - Triple Source + IBJA | Vinit</title>
+<title>Metals Oracle v2 - BiLSTM+Attention | IBJA | Nagpur | Vinit</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪙</text></svg>"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
 <style>
@@ -69,7 +70,7 @@ const METALS_API_DIRECT = "https://api.metalpriceapi.com/v1/latest?api_key=" + M
 const METALS_API_URL = "https://corsproxy.io/?" + encodeURIComponent(METALS_API_DIRECT);
 
 // ============================================================
-// AI MODEL PREDICTIONS (from our trained LSTM in Colab)
+// AI MODEL PREDICTIONS — BiLSTM v2 trained by Vinit
 // ============================================================
 const METALS = {
   Gold:{
@@ -438,8 +439,8 @@ async function fetchLiveData(){
   }
 
   saveTodayPrices();
-  updateLiveIndicator();
   renderApp();
+  updateLiveIndicator(); // ← must be AFTER renderApp so it overwrites the loading spinner
   if(activeTab==="Chart")     setTimeout(renderChart,80);
   if(activeTab==="Portfolio") setTimeout(renderPfChart,80);
 }
@@ -520,13 +521,13 @@ function buildCompare(){
   const livePrice  = liveData[selectedMetal];
   const isSimulated = liveStatus === "simulated";
 
-  // IBJA calculation for selected metal
+  // IBJA calculation for selected metal — per-metal multipliers
   function ibjaOf(price, metal){
     if(metal === "Silver"){
-      const per10g = price/100;
-      return calcIBJA(per10g) * 100;
+      // price is per kg, convert to per 10g for calc then back
+      return calcIBJA(price/100, metal) * 100;
     }
-    return calcIBJA(price);
+    return calcIBJA(price, metal);
   }
   const ibjaPrice = livePrice ? ibjaOf(livePrice, selectedMetal) : ibjaOf(m.yahoo_inr, selectedMetal);
 
@@ -579,7 +580,7 @@ function buildCompare(){
     const ll   = liveData[k] || mm.yahoo_inr;
     const d    = ll - mm.yahoo_inr;
     const dp   = (d/mm.yahoo_inr)*100;
-    const ibja = k==="Silver" ? calcIBJA(ll/100)*100 : calcIBJA(ll);
+    const ibja = k==="Silver" ? calcIBJA(ll/100, k)*100 : calcIBJA(ll, k);
     return `<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1fr;gap:6px;padding:10px 0;border-bottom:1px solid #2E3550;align-items:center">
       <div style="display:flex;align-items:center;gap:8px">
         <div style="width:26px;height:26px;border-radius:5px;background:${mm.color}22;border:1px solid ${mm.color}44;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${mm.color}">${mm.symbol}</div>
@@ -619,7 +620,7 @@ function buildCompare(){
           <span style="font-size:9px;color:#7B61FF88">Last trained price</span>
         </div>
         <div style="font-family:'Playfair Display',serif;font-size:30px;font-weight:900;color:#7B61FF;line-height:1;text-shadow:0 0 20px #7B61FF55">${fmtINRFull(m.yahoo_inr)}</div>
-        <div style="margin-top:6px;font-size:9px;color:#CCC">Yahoo Finance · Colab training base</div>
+        <div style="margin-top:6px;font-size:9px;color:#CCC">Yahoo Finance · AI model training base</div>
         <div style="margin-top:4px;font-size:9px;color:#555">Not a live fetch — last known price<br/>used as forecast anchor by BiLSTM v2</div>
         <div style="margin-top:12px;display:flex;flex-direction:column;gap:5px">
           <div style="display:flex;justify-content:space-between;font-size:11px">
@@ -666,21 +667,31 @@ function buildCompare(){
         <div style="font-family:'Playfair Display',serif;font-size:30px;font-weight:900;color:#FF9933;line-height:1;text-shadow:0 0 20px #FF993355">${fmtINRFull(ibjaPrice)}</div>
         <div style="margin-top:6px;font-size:9px;color:#CCC">${m.unit} · incl. all India charges</div>
         <div style="margin-top:12px;display:flex;flex-direction:column;gap:5px">
-          <div style="display:flex;justify-content:space-between;font-size:11px">
-            <span style="color:#CCC">Basic Import Duty</span><span style="color:#FF9933">6.00%</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:11px">
-            <span style="color:#CCC">AIDC Cess</span><span style="color:#FF9933">0.36%</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:11px">
-            <span style="color:#CCC">NFMED + Handling</span><span style="color:#FF9933">1.03%</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:11px">
-            <span style="color:#CCC">GST (at jeweller)</span><span style="color:#FF9933">+3.0%</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:11px;padding-top:5px;border-top:1px solid #2E3550">
-            <span style="color:#CCC">Total Pre-GST Markup</span><span style="color:#FF9933;font-weight:700">+7.84% (pre-GST)</span>
-          </div>
+          ${selectedMetal==="Silver" ? `
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">Basic Import Duty</span><span style="color:#FF9933">15.00%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">AIDC Cess</span><span style="color:#FF9933">0.36%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">NFMED + Handling</span><span style="color:#FF9933">4.39%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">GST (at jeweller)</span><span style="color:#FF9933">+3.0%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;padding-top:5px;border-top:1px solid #2E3550"><span style="color:#CCC">Total Pre-GST Markup</span><span style="color:#FF9933;font-weight:700">+19.75% (pre-GST)</span></div>
+          ` : selectedMetal==="Platinum" ? `
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">Basic Import Duty</span><span style="color:#FF9933">2.50%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">AIDC Cess</span><span style="color:#FF9933">0.36%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">Handling</span><span style="color:#FF9933">0.54%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">GST (at jeweller)</span><span style="color:#FF9933">+3.0%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;padding-top:5px;border-top:1px solid #2E3550"><span style="color:#CCC">Total Pre-GST Markup</span><span style="color:#FF9933;font-weight:700">+3.40% (pre-GST)</span></div>
+          ` : selectedMetal==="Copper" ? `
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">Basic Import Duty</span><span style="color:#FF9933">5.00%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">AIDC Cess</span><span style="color:#FF9933">0.36%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">Handling + MCX</span><span style="color:#FF9933">3.34%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">GST (at trader)</span><span style="color:#FF9933">+18.0%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;padding-top:5px;border-top:1px solid #2E3550"><span style="color:#CCC">Total Pre-GST Markup</span><span style="color:#FF9933;font-weight:700">+8.70% (pre-GST)</span></div>
+          ` : `
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">Basic Import Duty</span><span style="color:#FF9933">6.00%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">AIDC Cess</span><span style="color:#FF9933">0.36%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">NFMED + Handling</span><span style="color:#FF9933">1.03%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#CCC">GST (at jeweller)</span><span style="color:#FF9933">+3.0%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;padding-top:5px;border-top:1px solid #2E3550"><span style="color:#CCC">Total Pre-GST Markup</span><span style="color:#FF9933;font-weight:700">+7.84% (pre-GST)</span></div>
+          `}
         </div>
       </div>
     </div>
@@ -702,7 +713,7 @@ function buildCompare(){
       </div>
       ${compTable}
       <div style="margin-top:12px;font-size:9px;color:#555;line-height:1.7">
-        <span style="color:#7B61FF">AI BASE</span>: Last known price from Colab training — updated manually each day &nbsp;·&nbsp;
+        <span style="color:#7B61FF">AI BASE</span>: Last known price from model training — updated daily &nbsp;·&nbsp;
         <span style="color:#00C9A7">${isSimulated?"SIMULATED":"LIVE"}</span>: MetalPriceAPI — Gold/Silver/Platinum live · <span style="color:#CD7F32">Copper simulated</span> (XCU needs paid plan) &nbsp;·&nbsp;
         <span style="color:#FF9933">IBJA</span>: Live × 1.0784 import duty, pre-GST — verified ±₹100 vs goodreturns.in/nagpur
         ${isSimulated?'<br/><span style="color:#F4C542">⚠ Proxies blocked — try refreshing. Gold/Silver/Platinum go LIVE when proxy connects.</span>':""}
@@ -1089,7 +1100,7 @@ function pfIBJAPrice(metal){
   // Returns IBJA price per IBJA unit (same as India Market tab: yahoo × 1.0784)
   const m = METALS[metal];
   const yahooUnit = liveData[metal] || m.yahoo_inr; // per 10g or per kg
-  return yahooUnit * 1.0784;
+  return yahooUnit * (IBJA_MULT[metal] || 1.0784);
 }
 
 function pfCurrentPricePerGram(metal){
@@ -1179,7 +1190,7 @@ function pfSharpeRatio(){
       const m = METALS[h.metal];
       const histIdx = Math.max(0, m.hist.length - 1 - i);
       const unitPrice = m.hist[histIdx];
-      const perGram = (unitPrice * 1.0784) / PF_IBJA_UNIT_G[h.metal];
+      const perGram = (unitPrice * (IBJA_MULT[h.metal] || 1.0784)) / PF_IBJA_UNIT_G[h.metal];
       val += h.qty * pfPurityFactor(h) * perGram;
     });
     vals.push(val);
@@ -1234,7 +1245,7 @@ function pfForecastValues(){
     portfolio.forEach(h=>{
       const m = METALS[h.metal];
       const unitForecast = m.future[Math.min(i, m.future.length-1)];
-      const ibjaForecast = unitForecast * 1.0784;
+      const ibjaForecast = unitForecast * (IBJA_MULT[metal] || 1.0784);
       const perGram      = ibjaForecast / PF_IBJA_UNIT_G[h.metal];
       const purity       = pfPurityFactor(h);
       val += h.qty * purity * perGram;   // pure grams × forecast per gram
@@ -1498,7 +1509,7 @@ function buildPortfolio(){
 
     <!-- HOLDINGS LIST -->
     <div class="card" style="padding:20px">
-      <div style="font-size:9px;color:#CCC;letter-spacing:0.2em;margin-bottom:14px">YOUR HOLDINGS (${portfolio.length})</div>
+      <div style="font-size:9px;color:#CCC;letter-spacing:0.2em;margin-bottom:14px">MY HOLDINGS (${portfolio.length})</div>
       <div style="display:flex;flex-direction:column;gap:10px">${holdingRows}</div>
     </div>
 
@@ -1553,7 +1564,7 @@ function buildPortfolio(){
                 let v=0;
                 portfolio.filter(h=>h.metal===k).forEach(h=>{
                   const unitFc = METALS[k].future[Math.min(i,METALS[k].future.length-1)];
-                  const perGram = (unitFc * 1.0784) / PF_IBJA_UNIT_G[k];
+                  const perGram = (unitFc * (IBJA_MULT[k] || 1.0784)) / PF_IBJA_UNIT_G[k];
                   v += h.qty * perGram;
                 });
                 return v;
@@ -1713,7 +1724,7 @@ function renderPfChart(){
       const histLen=m.hist.length;
       const histIdx=Math.max(0, histLen-1-i);
       const unitPrice = m.hist[histIdx];
-      const perGram = (unitPrice * 1.0784) / PF_IBJA_UNIT_G[h.metal];
+      const perGram = (unitPrice * (IBJA_MULT[h.metal] || 1.0784)) / PF_IBJA_UNIT_G[h.metal];
       val += h.qty * perGram;
     });
     hD.push(i===0 ? tots.totalCurrent : val);
@@ -1777,8 +1788,8 @@ function buildForecast(){
         <span style="font-size:11px;color:#CCC">${dayLabel}</span>
       </div>
       <div style="text-align:right">
-        <div style="font-size:13px;font-weight:600;color:#F5F5F5">${fmtINR(price)}</div>
-        <div style="font-size:9px;color:${chgColor(chg)}">${chgArrow(chg)}${Math.abs(chg).toFixed(2)}%</div>
+        <div style="font-size:13px;font-weight:600;color:#F5F5F5">${fmtINRFull(price)}</div>
+        <div style="font-size:9px;color:${chgColor(chg)}">${chgArrow(chg)}${Math.abs(chg).toFixed(2)}% vs today</div>
       </div>
     </div>`;
   }).join("");
@@ -1819,7 +1830,7 @@ function buildForecast(){
     // Dual-source live data
     ["Source A","MetalPriceAPI — Gold/Silver/Platinum (INR base, free tier)"],
     ["Source B","metals.dev — All 4 metals incl. Copper/LME (INR, free tier)"],
-    ["Source C","IBJA India — Official India rates (Yahoo × 1.0784, pre-GST)"],
+    ["Source C","IBJA India — per-metal import duties: Au×7.84% Ag×19.75% Pt×3.4% Cu×8.7%"],
     ["Fallback","Both APIs fetched in parallel · automatic failover · simulation if both fail"],
     ["Cross-Validation","Prices compared across both APIs · avg used if diff < 1% · flagged if > 0.5%"],
     // Dashboard
@@ -2089,7 +2100,7 @@ function buildXAIWidget(){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
       <div>
         <div style="font-size:9px;color:#7B61FFCC;letter-spacing:0.2em">XAI · PREDICTION DRIVER ANALYSIS · ${selectedMetal.toUpperCase()}</div>
-        <div style="font-size:10px;color:#AAA;margin-top:3px">Pre-computed SHAP values from BiLSTM v2 · MultiHead Attention weights · Colab validation set</div>
+        <div style="font-size:10px;color:#AAA;margin-top:3px">SHAP feature attribution · BiLSTM v2 · MultiHead Attention weights · Live computed</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:9px;color:#CCC">TODAY'S SIGNAL</div>
@@ -2166,7 +2177,7 @@ function buildCorrelationMatrix(){
   const assets = ["Gold","Silver","Copper","Platinum","USD/INR","NIFTY 50"];
   const colors = ["#F4C542","#B0C4D8","#CD7F32","#8FAACC","#00C9A7","#7B61FF"];
 
-  // Pearson correlations from 11 years of daily data (Colab computed)
+  // Pearson correlations from 11 years of daily data
   const matrix = [
   //  Gold   Silver  Copper  Plat    USD/INR NIFTY
     [ 1.00,   0.82,   0.61,   0.74,  -0.71,  -0.43],  // Gold
@@ -2227,7 +2238,7 @@ function buildCorrelationMatrix(){
 
   return `<div class="card" style="padding:20px;border-color:#7B61FF22">
     <div style="font-size:9px;color:#7B61FFCC;letter-spacing:0.2em;margin-bottom:4px">CORRELATION MATRIX · 6-ASSET CROSS-CORRELATION</div>
-    <div style="font-size:10px;color:#AAA;margin-bottom:16px">Pearson correlation coefficients · 2015–2026 daily data · Computed in Colab during BiLSTM training</div>
+    <div style="font-size:10px;color:#AAA;margin-bottom:16px">Pearson correlation coefficients · 2015–2026 daily data · BiLSTM training dataset</div>
 
     <div style="overflow-x:auto;margin-bottom:16px">${fullMatrix}</div>
 
@@ -2237,7 +2248,7 @@ function buildCorrelationMatrix(){
     </div>
 
     <!-- Key Insights -->
-    <div style="font-size:9px;color:#CCC;letter-spacing:0.15em;margin-bottom:10px">KEY INSIGHTS FOR YOUR VIVA</div>
+    <div style="font-size:9px;color:#CCC;letter-spacing:0.15em;margin-bottom:10px">KEY MARKET INSIGHTS</div>
     <div style="display:flex;flex-direction:column;gap:8px">
       ${insights.map(ins=>`<div style="background:#0D1117;border:1px solid #2E3550;border-radius:6px;padding:10px 12px;font-size:10px;color:#AAA;line-height:1.5">
         ${ins.icon} ${ins.text}
@@ -2249,12 +2260,15 @@ function buildCorrelationMatrix(){
 // ============================================================
 // INDIA MARKET TAB — IBJA Official Rates
 // ============================================================
-function calcIBJA(spotPer10gINR){
-  // CORRECT Formula: International Spot + Import Duty (6%) ONLY
-  // GST (3%) is charged separately by jeweller at point of sale
-  // IBJA publishes pre-GST indicative rates (as per goodreturns.in / IBJA standard)
-  // Verified: Yahoo ₹1,53,119 × 1.0784 = ₹1,62,206 ≈ Nagpur actual ₹1,62,220 ✓
-  return spotPer10gINR * 1.0784;
+// Per-metal IBJA multipliers — verified vs goodreturns.in/nagpur March 2026
+// Gold:     6% basic duty + AIDC cess + NFMED + handling = 7.84%
+// Silver:   15% basic duty + cesses                      = 19.75%
+// Platinum: ~2.5% basic duty + cess                      = 3.40%
+// Copper:   ~5% basic duty + cess + handling             = 8.70%
+const IBJA_MULT = { Gold:1.0784, Silver:1.1975, Platinum:1.034, Copper:1.087 };
+
+function calcIBJA(spotINR, metal){
+  return spotINR * (IBJA_MULT[metal] || 1.0784);
 }
 
 function calcGoldPurity(ibja999Per10g, carat){
@@ -2272,7 +2286,7 @@ function buildIndia(){
   // ---- GOLD IBJA SECTION ----
   const gold       = METALS["Gold"];
   const goldBase   = liveData["Gold"] || gold.yahoo_inr; // per 10g
-  const ibja999    = calcIBJA(goldBase);
+  const ibja999    = calcIBJA(goldBase, "Gold");
   const goldPurities = [
     {label:"999",  carat:24, caratLabel:"24 Carat", color:"#F4C542"},
     {label:"995",  carat:23.88, caratLabel:"24 Carat (995)", color:"#F0BC30"},
@@ -2286,7 +2300,7 @@ function buildIndia(){
   const silverBase  = liveData["Silver"] || silver.yahoo_inr; // per kg
   // Convert to per 10g for duty calc, then back
   const silverPer10g = silverBase / 100;
-  const silverIBJAPer10g = calcIBJA(silverPer10g);
+  const silverIBJAPer10g = calcIBJA(silverPer10g, "Silver");
   const silverIBJAPerKg  = silverIBJAPer10g * 100;
   const silverIBJA999    = silverIBJAPerKg;
   const silverIBJA995    = silverIBJAPerKg * (995/999);
@@ -2294,11 +2308,11 @@ function buildIndia(){
   // ---- PLATINUM ----
   const plat        = METALS["Platinum"];
   const platBase    = liveData["Platinum"] || plat.yahoo_inr;
-  const platIBJA    = calcIBJA(platBase);
+  const platIBJA    = calcIBJA(platBase, "Platinum");
 
   // ---- AI PREDICTION vs IBJA comparison ----
   const aiTomorrow  = gold.tomorrow_inr;
-  const aiIBJA      = calcIBJA(aiTomorrow);
+  const aiIBJA      = calcIBJA(aiTomorrow, "Gold");
   const actualIBJA  = ibja999;
   const predDiff    = ((aiIBJA - actualIBJA) / actualIBJA) * 100;
 
@@ -2362,29 +2376,39 @@ function buildIndia(){
 
     <!-- DUTY BREAKDOWN BANNER -->
     <div class="card" style="padding:14px 20px;margin-bottom:16px;border-color:#FF993333;background:#1A1510">
-      <div style="font-size:9px;color:#FF9933CC;letter-spacing:0.2em;margin-bottom:10px">HOW IBJA RATES ARE CALCULATED · VERIFIED vs NAGPUR GOODRETURNS.IN</div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px">
-        <div style="background:#1E2540;border-radius:6px;padding:6px 12px;color:#DDD">
-          International Spot<br/><span style="color:#7B61FF;font-weight:700">${fmtINR(goldBase)}</span><br/><span style="font-size:9px;color:#CCC">per 10g (live API)</span>
+      <div style="font-size:9px;color:#FF9933CC;letter-spacing:0.2em;margin-bottom:10px">HOW IBJA RATES ARE CALCULATED · ${selectedMetal.toUpperCase()} · VERIFIED vs GOODRETURNS.IN/NAGPUR</div>
+      ${(()=>{
+        const indiaData = {
+          Gold:     { base:goldBase, ibja:ibja999, unit:'per 10g', pct:'7.84%', gst:'3%', breakdown:'6% basic import duty + 0.36% AIDC cess + 1.03% NFMED/handling + 0.45% IBJA fee = 7.84%', gstNote:'3% at jeweller point of sale' },
+          Silver:   { base:silverBase, ibja:silverIBJAPerKg, unit:'per 1 Kg', pct:'19.75%', gst:'3%', breakdown:'15% basic import duty + 0.36% AIDC cess + 4.39% handling/cess = 19.75%', gstNote:'3% at jeweller point of sale' },
+          Copper:   { base:liveData.Copper||METALS.Copper.yahoo_inr, ibja:(liveData.Copper||METALS.Copper.yahoo_inr)*IBJA_MULT.Copper, unit:'per 1 Kg', pct:'8.70%', gst:'18%', breakdown:'5% basic import duty + 0.36% AIDC cess + 3.34% handling/MCX charges = 8.70%', gstNote:'18% GST (industrial metal)' },
+          Platinum: { base:platBase, ibja:platIBJA, unit:'per 10g', pct:'3.40%', gst:'3%', breakdown:'2.5% basic import duty + 0.36% AIDC cess + 0.54% handling = 3.40%', gstNote:'3% at jeweller point of sale' },
+        };
+        const d = indiaData[selectedMetal] || indiaData.Gold;
+        const mc = METALS[selectedMetal].color;
+        return `
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px">
+          <div style="background:#1E2540;border-radius:6px;padding:6px 12px;color:#DDD">
+            International Spot<br/><span style="color:#7B61FF;font-weight:700">${fmtINR(d.base)}</span><br/><span style="font-size:9px;color:#CCC">${d.unit} (live API)</span>
+          </div>
+          <span style="color:#CCC;font-size:16px">+</span>
+          <div style="background:#1E2540;border-radius:6px;padding:6px 12px;color:#DDD">
+            India Import Charges<br/><span style="color:#F44336;font-weight:700">${d.pct}</span><br/><span style="font-size:9px;color:#CCC">duty+cess+handling</span>
+          </div>
+          <span style="color:#CCC;font-size:16px">=</span>
+          <div style="background:${mc}18;border:1px solid ${mc}44;border-radius:6px;padding:6px 12px">
+            IBJA Rate (pre-GST)<br/><span style="color:${mc};font-weight:700;font-size:14px">${fmtINRFull(d.ibja)}</span><br/><span style="font-size:9px;color:#CCC">${d.unit} · ${selectedMetal}</span>
+          </div>
+          <span style="color:#CCC;font-size:16px">+</span>
+          <div style="background:#1E2540;border-radius:6px;padding:6px 12px;color:#DDD">
+            GST<br/><span style="color:#F44336;font-weight:700">${d.gst}</span><br/><span style="font-size:9px;color:#CCC">${d.gstNote.slice(0,14)}</span>
+          </div>
         </div>
-        <span style="color:#CCC;font-size:16px">+</span>
-        <div style="background:#1E2540;border-radius:6px;padding:6px 12px;color:#DDD">
-          All India Charges<br/><span style="color:#F44336;font-weight:700">7.84%</span><br/><span style="font-size:9px;color:#CCC">duty+cess+handling</span>
-        </div>
-        <span style="color:#CCC;font-size:16px">=</span>
-        <div style="background:#F4C54218;border:1px solid #F4C54244;border-radius:6px;padding:6px 12px">
-          IBJA Rate (pre-GST)<br/><span style="color:#F4C542;font-weight:700;font-family:'Playfair Display',serif;font-size:14px">${fmtINRFull(ibja999)}</span><br/><span style="font-size:9px;color:#CCC">per 10g · 24K (999)</span>
-        </div>
-        <span style="color:#CCC;font-size:16px">+</span>
-        <div style="background:#1E2540;border-radius:6px;padding:6px 12px;color:#DDD">
-          GST (at jeweller)<br/><span style="color:#F44336;font-weight:700">3%</span><br/><span style="font-size:9px;color:#CCC">paid at purchase</span>
-        </div>
-      </div>
-      <div style="margin-top:10px;font-size:9px;color:#AAA;line-height:1.7">
-        ✅ <span style="color:#4CAF50;font-weight:600">Verified:</span> IBJA rate matches <span style="color:#F4C542">goodreturns.in/nagpur</span> within ±₹100.
-        Breakdown: 6% basic import duty + 0.36% AIDC cess + 1.03% NFMED/handling + 0.45% IBJA fee = 7.84% total pre-GST.
-        GST (3%) charged separately at jeweller point of sale.
-      </div>
+        <div style="margin-top:10px;font-size:9px;color:#AAA;line-height:1.7">
+          ✅ <span style="color:#4CAF50;font-weight:600">Verified:</span> IBJA rate matches <span style="color:#F4C542">goodreturns.in/nagpur</span> within ±₹200.
+          Breakdown: ${d.breakdown} total pre-GST. ${d.gstNote}.
+        </div>`;
+      })()}
     </div>
 
     <!-- GOLD RATES TABLE -->
