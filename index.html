@@ -209,9 +209,10 @@ let dataSource = {}; // { Gold: "MetalPriceAPI", Silver: "metals.dev", ... }
 let crossCheck  = {}; // { Gold: {a: 141774, b: 141820, diff: 0.03%}, ... }
 
 function applyRates(rates){
-  if(rates.INRXAU) liveData.Gold     = (1/rates.INRXAU) * (10/31.1035);
-  if(rates.INRXAG) liveData.Silver   = (1/rates.INRXAG) * (1000/31.1035);
-  if(rates.INRXPT) liveData.Platinum = (1/rates.INRXPT) * (10/31.1035);
+  // MetalPriceAPI base=INR: INRXAU = INR per 0.1 troy oz, INRXAG = INR per troy oz
+  if(rates.INRXAU) liveData.Gold     = rates.INRXAU * (100/31.1035);   // per 10g
+  if(rates.INRXAG) liveData.Silver   = rates.INRXAG * (1000/31.1035);  // per kg
+  if(rates.INRXPT) liveData.Platinum = rates.INRXPT * (100/31.1035);   // per 10g
   if(rates.INRXAU) dataSource.Gold     = "MetalPriceAPI";
   if(rates.INRXAG) dataSource.Silver   = "MetalPriceAPI";
   if(rates.INRXPT) dataSource.Platinum = "MetalPriceAPI";
@@ -220,17 +221,16 @@ function applyRates(rates){
 
 // ── Parse metals.dev response → INR prices ────────────────────
 function applyMetalsDev(data){
-  // metals.dev returns toz prices in chosen currency
-  // Gold/Platinum: toz → per 10g = × (10/31.1035)
-  // Silver: toz → per kg = × (1000/31.1035)
-  // Copper: per mt in INR → per kg = ÷ 1000
+  // metals.dev with unit=mt returns INR per metric tonne
+  // Gold/Platinum: mt → per 10g = ÷ 100,000
+  // Silver/Copper: mt → per kg  = ÷ 1,000
   const m = data.metals;
   const applied = {};
-  if(m?.gold)     { applied.Gold     = m.gold     * (10/31.1035);   }
-  if(m?.silver)   { applied.Silver   = m.silver   * (1000/31.1035); }
-  if(m?.platinum) { applied.Platinum = m.platinum * (10/31.1035);   }
-  if(m?.copper)   { applied.Copper   = m.copper   / 1000;           }
-  else if(m?.lme_copper){ applied.Copper = m.lme_copper / 1000;     }
+  if(m?.gold)      { applied.Gold     = m.gold / 100000;     } // INR/mt → INR/10g
+  if(m?.silver)    { applied.Silver   = m.silver / 1000;     } // INR/mt → INR/kg
+  if(m?.platinum)  { applied.Platinum = m.platinum / 100000; } // INR/mt → INR/10g
+  if(m?.copper)    { applied.Copper   = m.copper / 1000;     } // INR/mt → INR/kg
+  else if(m?.lme_copper){ applied.Copper = m.lme_copper/1000;}
   return applied;
 }
 
@@ -282,7 +282,7 @@ async function tryProxy(url, parseContents){
 
 // ── Fetch from metals.dev (Source B) ─────────────────────────
 async function fetchMetalsDev(){
-  const BASE = `https://api.metals.dev/v1/latest?api_key=${METALS_DEV_KEY}&currency=INR&unit=toz`;
+  const BASE = `https://api.metals.dev/v1/latest?api_key=${METALS_DEV_KEY}&currency=INR&unit=mt`;
   const PROXIES = [
     {url:"https://api.allorigins.win/get?url="+encodeURIComponent(BASE), parse:true},
     {url:"https://corsproxy.io/?"+encodeURIComponent(BASE),              parse:false},
@@ -318,9 +318,10 @@ async function fetchMetalPriceAPI(){
       console.log("MetalPriceAPI proxy "+(i+1)+" response:", JSON.stringify(data).slice(0,100));
       if(data?.rates && Object.keys(data.rates).length > 0){
         const prices = {};
-        if(data.rates.INRXAU) prices.Gold     = (1/data.rates.INRXAU)*(10/31.1035);
-        if(data.rates.INRXAG) prices.Silver   = (1/data.rates.INRXAG)*(1000/31.1035);
-        if(data.rates.INRXPT) prices.Platinum = (1/data.rates.INRXPT)*(10/31.1035);
+        // MetalPriceAPI base=INR: INRXAU = INR per 0.1 troy oz, INRXAG = INR per troy oz
+        if(data.rates.INRXAU) prices.Gold     = data.rates.INRXAU * (100/31.1035);   // per 10g
+        if(data.rates.INRXAG) prices.Silver   = data.rates.INRXAG * (1000/31.1035);  // per kg
+        if(data.rates.INRXPT) prices.Platinum = data.rates.INRXPT * (100/31.1035);   // per 10g
         if(Object.keys(prices).length > 0) return prices;
       }
     }catch(e){ console.log("MetalPriceAPI proxy "+(i+1)+" failed:", e.message); }
