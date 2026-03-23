@@ -1929,14 +1929,30 @@ function saveTodayPrices(){
   try{
     const today = new Date().toISOString().slice(0,10);
     const stored = JSON.parse(localStorage.getItem("mo_prices")||"{}");
-    if(!stored[today]){
-      stored[today] = {};
-      metalKeys.forEach(k=>{ if(liveData[k]) stored[today][k]=liveData[k]; });
-      // Keep only last 3 days to save space
-      const days = Object.keys(stored).sort();
-      if(days.length>3) delete stored[days[0]];
-      localStorage.setItem("mo_prices", JSON.stringify(stored));
-    }
+    // Clean up any corrupt entries (prices should be within realistic ranges)
+    const RANGES = {Gold:[50000,500000], Silver:[50000,1000000], Copper:[500,5000], Platinum:[20000,200000]};
+    Object.keys(stored).forEach(day=>{
+      metalKeys.forEach(k=>{
+        const p = stored[day]?.[k];
+        const r = RANGES[k];
+        if(p && r && (p < r[0] || p > r[1])){
+          console.warn('Removing corrupt price from localStorage:', k, p);
+          delete stored[day][k];
+        }
+      });
+    });
+    if(!stored[today]) stored[today] = {};
+    metalKeys.forEach(k=>{
+      if(liveData[k]){
+        const r = RANGES[k];
+        if(liveData[k] >= r[0] && liveData[k] <= r[1])
+          stored[today][k] = liveData[k];
+      }
+    });
+    // Keep only last 3 days
+    const days = Object.keys(stored).sort();
+    if(days.length > 3) delete stored[days[0]];
+    localStorage.setItem("mo_prices", JSON.stringify(stored));
   }catch(e){}
 }
 
@@ -1965,7 +1981,12 @@ function scaledForecast(metal){
 function liveChange1d(metal){
   const live = liveData[metal] || METALS[metal].yahoo_inr;
   const yest = getYesterdayPrice(metal);
-  if(yest && yest>0) return ((live-yest)/yest)*100;
+  if(yest && yest > 0){
+    const chg = ((live - yest) / yest) * 100;
+    // Sanity check — real metals never move more than 15% in a day
+    if(Math.abs(chg) > 15) return METALS[metal].change_1d; // fallback to hardcoded
+    return chg;
+  }
   return METALS[metal].change_1d; // fallback to hardcoded
 }
 
@@ -2010,11 +2031,12 @@ function computeXAI(metal){
   const ma30Eff   = parseFloat((ma30Div * 0.12).toFixed(2));
   const ma7Eff    = parseFloat((ma7Div  * 0.08).toFixed(2));
 
-  // Cross-metal correlation effect
+  // Cross-metal correlation effect — capped to realistic range
   const peers = metalKeys.filter(k=>k!==metal);
-  const peerEff = parseFloat((peers.reduce((sum,k)=>{
-    const pc = liveChange1d(k); return sum+pc;
-  },0) / peers.length * 0.15).toFixed(2));
+  const peerChgs = peers.map(k=>liveChange1d(k)).filter(v=>Math.abs(v)<15);
+  const peerEff = peerChgs.length > 0
+    ? parseFloat((peerChgs.reduce((s,v)=>s+v,0) / peerChgs.length * 0.15).toFixed(2))
+    : 0;
 
   // Direction and summary
   const direction = chg1d >= 0 ? 1 : -1;
@@ -2804,6 +2826,22 @@ function injectTVWidgets(){
 // INIT
 // ============================================================
 renderApp();
+// Clear corrupt localStorage prices from previous buggy versions
+try{
+  const stored = JSON.parse(localStorage.getItem("mo_prices")||"{}");
+  const RANGES = {Gold:[50000,500000],Silver:[50000,1000000],Copper:[500,5000],Platinum:[20000,200000]};
+  let dirty = false;
+  Object.keys(stored).forEach(day=>{
+    metalKeys.forEach(k=>{
+      const p = stored[day]?.[k];
+      if(p && RANGES[k] && (p<RANGES[k][0]||p>RANGES[k][1])){
+        delete stored[day][k]; dirty=true;
+        console.log('Cleared corrupt price:', k, p);
+      }
+    });
+  });
+  if(dirty) localStorage.setItem("mo_prices", JSON.stringify(stored));
+}catch(e){}
 fetchLiveData();
 setInterval(updateClock, 1000);
 // Init counter display from saved usage
