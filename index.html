@@ -522,14 +522,14 @@ function buildCompare(){
   const isSimulated = liveStatus === "simulated";
 
   // IBJA calculation for selected metal — per-metal multipliers
+  // OFFICIAL IBJA = yahoo_inr × multiplier (goodreturns morning rate, calibrated)
+  // LIVE EQUIVALENT = livePrice × multiplier (shows live conversion, informational only)
   function ibjaOf(price, metal){
-    if(metal === "Silver"){
-      // price is per kg, convert to per 10g for calc then back
-      return calcIBJA(price/100, metal) * 100;
-    }
+    if(metal === "Silver") return calcIBJA(price/100, metal) * 100;
     return calcIBJA(price, metal);
   }
-  const ibjaPrice = livePrice ? ibjaOf(livePrice, selectedMetal) : ibjaOf(m.yahoo_inr, selectedMetal);
+  const ibjaPrice     = ibjaOf(m.yahoo_inr, selectedMetal); // ← ALWAYS use yahoo_inr for official IBJA
+  const ibjaLiveEquiv = livePrice ? ibjaOf(livePrice, selectedMetal) : ibjaPrice; // ← live equivalent
 
   const liveSection = liveStatus === "loading"
     ? `<div style="display:flex;align-items:center;justify-content:center;height:80px;gap:10px">
@@ -541,8 +541,8 @@ function buildCompare(){
        <div style="margin-top:6px;font-size:10px;color:#CCC">${isSimulated?"Smart market simulation (demo mode)":"MetalPriceAPI · Real-time spot rate"}</div>
        <div style="margin-top:4px;font-size:10px;color:${isSimulated?"#F4C542":"#00C9A7"}">${isSimulated?"Based on Yahoo Finance base price":"Live data connected ✓"}</div>
        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #2E3550">
-         <div style="font-size:9px;color:#FF9933CC;letter-spacing:0.15em;margin-bottom:4px">IBJA EQUIVALENT</div>
-         <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#FF9933">${fmtINRFull(ibjaPrice)}</div>
+         <div style="font-size:9px;color:#FF9933CC;letter-spacing:0.15em;margin-bottom:4px">IBJA EQUIVALENT (live spot)</div>
+         <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#FF9933">${fmtINRFull(ibjaLiveEquiv)}</div>
          <div style="font-size:9px;color:#CCC;margin-top:2px">incl. 7.84% total charges · pre-GST (IBJA rate)</div>
        </div>
        <div style="margin-top:8px;font-size:11px;color:#CCC">${lastUpdated?"Updated: "+lastUpdated.toLocaleTimeString("en-IN"):""}</div>`
@@ -580,7 +580,8 @@ function buildCompare(){
     const ll   = liveData[k] || mm.yahoo_inr;
     const d    = ll - mm.yahoo_inr;
     const dp   = (d/mm.yahoo_inr)*100;
-    const ibja = k==="Silver" ? calcIBJA(ll/100, k)*100 : calcIBJA(ll, k);
+    // IBJA always from yahoo_inr (official morning rate) not live price
+    const ibja = k==="Silver" ? calcIBJA(mm.yahoo_inr/100, k)*100 : calcIBJA(mm.yahoo_inr, k);
     return `<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1fr;gap:6px;padding:10px 0;border-bottom:1px solid #2E3550;align-items:center">
       <div style="display:flex;align-items:center;gap:8px">
         <div style="width:26px;height:26px;border-radius:5px;background:${mm.color}22;border:1px solid ${mm.color}44;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${mm.color}">${mm.symbol}</div>
@@ -1097,10 +1098,9 @@ const PF_IBJA_UNIT_G = { Gold:10, Silver:1000, Copper:1000, Platinum:10 };
 const PF_IBJA_UNIT_LABEL = { Gold:"10g", Silver:"1kg", Copper:"1kg", Platinum:"10g" };
 
 function pfIBJAPrice(metal){
-  // Returns IBJA price per IBJA unit (same as India Market tab: yahoo × 1.0784)
+  // IBJA always from yahoo_inr (official morning rate) — live price fluctuates but IBJA is fixed daily
   const m = METALS[metal];
-  const yahooUnit = liveData[metal] || m.yahoo_inr; // per 10g or per kg
-  return yahooUnit * (IBJA_MULT[metal] || 1.0784);
+  return m.yahoo_inr * (IBJA_MULT[metal] || 1.0784);
 }
 
 function pfCurrentPricePerGram(metal){
@@ -2306,8 +2306,9 @@ function buildIndia(){
   const basePrice  = livePrice; // per 10g for Gold/Platinum, per kg for Silver/Copper
 
   // ---- GOLD IBJA SECTION ----
+  // Always use yahoo_inr for official IBJA — live price fluctuates but IBJA publishes once-a-day
   const gold       = METALS["Gold"];
-  const goldBase   = liveData["Gold"] || gold.yahoo_inr; // per 10g
+  const goldBase   = gold.yahoo_inr; // official morning rate, not live
   const ibja999    = calcIBJA(goldBase, "Gold");
   const goldPurities = [
     {label:"999",  carat:24, caratLabel:"24 Carat", color:"#F4C542"},
@@ -2319,8 +2320,7 @@ function buildIndia(){
 
   // ---- SILVER IBJA ----
   const silver      = METALS["Silver"];
-  const silverBase  = liveData["Silver"] || silver.yahoo_inr; // per kg
-  // Convert to per 10g for duty calc, then back
+  const silverBase  = silver.yahoo_inr; // official morning rate
   const silverPer10g = silverBase / 100;
   const silverIBJAPer10g = calcIBJA(silverPer10g, "Silver");
   const silverIBJAPerKg  = silverIBJAPer10g * 100;
@@ -2329,7 +2329,7 @@ function buildIndia(){
 
   // ---- PLATINUM ----
   const plat        = METALS["Platinum"];
-  const platBase    = liveData["Platinum"] || plat.yahoo_inr;
+  const platBase    = plat.yahoo_inr; // official morning rate
   const platIBJA    = calcIBJA(platBase, "Platinum");
 
   // ---- AI PREDICTION vs IBJA comparison ----
@@ -2401,17 +2401,17 @@ function buildIndia(){
       <div style="font-size:9px;color:#FF9933CC;letter-spacing:0.2em;margin-bottom:10px">HOW IBJA RATES ARE CALCULATED · ${selectedMetal.toUpperCase()} · VERIFIED vs GOODRETURNS.IN/NAGPUR</div>
       ${(()=>{
         const indiaData = {
-          Gold:     { base:goldBase, ibja:ibja999, unit:'per 10g', pct:'7.84%', gst:'3%', breakdown:'6% basic import duty + 0.36% AIDC cess + 1.03% NFMED/handling + 0.45% IBJA fee = 7.84%', gstNote:'3% at jeweller point of sale' },
-          Silver:   { base:silverBase, ibja:silverIBJAPerKg, unit:'per 1 Kg', pct:'19.75%', gst:'3%', breakdown:'15% basic import duty + 0.36% AIDC cess + 4.39% handling/cess = 19.75%', gstNote:'3% at jeweller point of sale' },
-          Copper:   { base:liveData.Copper||METALS.Copper.yahoo_inr, ibja:(liveData.Copper||METALS.Copper.yahoo_inr)*IBJA_MULT.Copper, unit:'per 1 Kg', pct:'8.70%', gst:'18%', breakdown:'5% basic import duty + 0.36% AIDC cess + 3.34% handling/MCX charges = 8.70%', gstNote:'18% GST (industrial metal)' },
-          Platinum: { base:platBase, ibja:platIBJA, unit:'per 10g', pct:'3.40%', gst:'3%', breakdown:'2.5% basic import duty + 0.36% AIDC cess + 0.54% handling = 3.40%', gstNote:'3% at jeweller point of sale' },
+          Gold:     { base:gold.yahoo_inr,   ibja:ibja999,       unit:'per 10g', pct:'7.84%',  gst:'3%',  breakdown:'6% basic import duty + 0.36% AIDC cess + 1.03% NFMED/handling + 0.45% IBJA fee = 7.84%', gstNote:'3% at jeweller point of sale' },
+          Silver:   { base:silver.yahoo_inr, ibja:silverIBJAPerKg,unit:'per 1 Kg',pct:'19.75%',gst:'3%',  breakdown:'15% basic import duty + 0.36% AIDC cess + 4.39% handling/cess = 19.75%', gstNote:'3% at jeweller point of sale' },
+          Copper:   { base:METALS.Copper.yahoo_inr, ibja:METALS.Copper.yahoo_inr*IBJA_MULT.Copper, unit:'per 1 Kg', pct:'8.70%', gst:'18%', breakdown:'5% basic import duty + 0.36% AIDC cess + 3.34% handling/MCX charges = 8.70%', gstNote:'18% GST (industrial metal)' },
+          Platinum: { base:plat.yahoo_inr,   ibja:platIBJA,      unit:'per 10g', pct:'3.40%',  gst:'3%',  breakdown:'2.5% basic import duty + 0.36% AIDC cess + 0.54% handling = 3.40%', gstNote:'3% at jeweller point of sale' },
         };
         const d = indiaData[selectedMetal] || indiaData.Gold;
         const mc = METALS[selectedMetal].color;
         return `
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px">
           <div style="background:#1E2540;border-radius:6px;padding:6px 12px;color:#DDD">
-            International Spot<br/><span style="color:#7B61FF;font-weight:700">${fmtINR(d.base)}</span><br/><span style="font-size:9px;color:#CCC">${d.unit} (live API)</span>
+            International Spot<br/><span style="color:#7B61FF;font-weight:700">${fmtINR(d.base)}</span><br/><span style="font-size:9px;color:#CCC">${d.unit} (morning rate)</span>
           </div>
           <span style="color:#CCC;font-size:16px">+</span>
           <div style="background:#1E2540;border-radius:6px;padding:6px 12px;color:#DDD">
