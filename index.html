@@ -165,7 +165,23 @@ let liveStatus = "loading";
 let lastUpdated = null;
 
 // ── PORTFOLIO STATE ───────────────────────────────────────────
-let portfolio = JSON.parse(localStorage.getItem("metals_portfolio")||"[]");
+let portfolio = (() => {
+  try {
+    const raw = JSON.parse(localStorage.getItem("metals_portfolio") || "[]");
+    // Migrate old field names: weight→qty, buyIBJA→buyPrice
+    return raw.map(h => ({
+      id:       h.id       || Date.now().toString(36),
+      metal:    h.metal    || "Gold",
+      qty:      h.qty      ?? h.weight ?? h.grams ?? 0,
+      unit:     h.unit     || "g",
+      purity:   h.purity   || "999",
+      buyPrice: h.buyPrice ?? h.buyIBJA ?? h.price ?? 0,
+      buyDate:  h.buyDate  || h.date   || new Date().toISOString().slice(0,10),
+      note:     h.note     || ""
+    })).filter(h => h.qty > 0 && h.buyPrice > 0 && METALS_KEYS_VALID.includes(h.metal));
+  } catch(e) { return []; }
+})();
+const METALS_KEYS_VALID = ["Gold","Silver","Copper","Platinum"];
 // Each holding: {id, metal, qty, unit, buyPrice, buyDate, note}
 let pfChartInstance = null;
 let pfForecastChart = null;
@@ -298,7 +314,7 @@ function smartSimulate(){
 
 async function tryProxy(url, parseContents){
   const controller = new AbortController();
-  const timer = setTimeout(()=>controller.abort(), 7000);
+  const timer = setTimeout(()=>controller.abort(), 4000); // 4s — faster fallback
   try{
     const res = await fetch(url, {signal: controller.signal});
     clearTimeout(timer);
@@ -388,14 +404,24 @@ async function fetchLiveData(){
     updateApiCounter(usage[today]);
   }catch(e){}
 
-  // ── Fetch both sources in parallel ───────────────────────────
-  const [pricesA, pricesB] = await Promise.allSettled([
+  // Master timeout — if BOTH sources take more than 10s total, give up and simulate
+  const masterTimeout = new Promise(resolve => setTimeout(() => resolve("timeout"), 10000));
+
+  const fetchBoth = Promise.allSettled([
     fetchMetalPriceAPI(),
     fetchMetalsDev()
   ]).then(r => r.map(p => p.status==="fulfilled" ? p.value : null));
 
-  console.log("Source A (MetalPriceAPI):", pricesA ? "✅ success" : "❌ failed");
-  console.log("Source B (metals.dev):   ", pricesB ? "✅ success" : "❌ failed");
+  const result = await Promise.race([fetchBoth, masterTimeout]);
+
+  let pricesA = null, pricesB = null;
+  if(result === "timeout"){
+    console.warn("Both APIs timed out — using smart simulation");
+  } else {
+    [pricesA, pricesB] = result;
+    console.log("Source A (MetalPriceAPI):", pricesA ? "✅ success" : "❌ failed");
+    console.log("Source B (metals.dev):   ", pricesB ? "✅ success" : "❌ failed");
+  }
 
   if(pricesA && pricesB){
     // BOTH sources available — cross-validate then merge
@@ -2640,12 +2666,26 @@ function switchMetal(k){
 }
 
 function switchTab(t){
-  activeTab=t;
-  const el=document.getElementById("tab-content");
+  activeTab = t;
+  const el = document.getElementById("tab-content");
   if(!el) return;
-  el.innerHTML=t==="Compare"?buildCompare():t==="Chart"?buildChart():t==="India"?buildIndia():t==="Portfolio"?buildPortfolio():t==="Technical"?buildTechnical():buildForecast();
-  if(t==="Chart") setTimeout(renderChart,50);
-  if(t==="Portfolio") setTimeout(renderPfChart,80);
+  try {
+    el.innerHTML = t==="Compare"    ? buildCompare()   :
+                   t==="Chart"      ? buildChart()     :
+                   t==="India"      ? buildIndia()     :
+                   t==="Portfolio"  ? buildPortfolio() :
+                   t==="Technical"  ? buildTechnical() :
+                                      buildForecast();
+  } catch(err) {
+    console.error("Tab build error:", err);
+    el.innerHTML = `<div style="padding:40px;text-align:center;color:#FF6666;font-size:12px">
+      ⚠ Error loading tab. <button onclick="portfolio=[];savePortfolio();switchTab('${t}')" 
+      style="background:#FF666622;border:1px solid #FF6666;color:#FF9999;padding:6px 14px;
+      border-radius:6px;cursor:pointer;font-size:11px;margin-left:8px">Reset & Retry</button>
+    </div>`;
+  }
+  if(t==="Chart")     setTimeout(renderChart,    50);
+  if(t==="Portfolio") setTimeout(renderPfChart,  80);
   if(t==="Technical") setTimeout(injectTVWidgets,100);
   document.querySelectorAll(".tab-btn").forEach(b=>{
     b.classList.toggle("active", b.textContent.trim().toLowerCase().includes(t.toLowerCase()));
