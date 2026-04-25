@@ -594,7 +594,10 @@ function buildCompare(){
         <div>
           <div style="font-size:9px;color:#CCC;letter-spacing:0.15em;margin-bottom:6px">AI TOMORROW</div>
           <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:#4CAF50">${fmtINR(m.tomorrow_inr)}</div>
-          <div style="font-size:11px;color:${chgColor(m.change_1d)};margin-top:4px">${chgArrow(m.change_1d)} ${Math.abs(m.change_1d).toFixed(2)}%</div>
+          ${(() => {
+            const tomorrowChg = ((m.tomorrow_inr - m.yahoo_inr) / m.yahoo_inr) * 100;
+            return `<div style="font-size:11px;color:${chgColor(tomorrowChg)};margin-top:4px">${chgArrow(tomorrowChg)} ${Math.abs(tomorrowChg).toFixed(2)}%</div>`;
+          })()}
           <div style="font-size:9px;color:#CCC;margin-top:4px">LSTM ${m.accuracy}% accuracy</div>
         </div>
       </div>`
@@ -848,7 +851,7 @@ function buildConfidenceBands(future, vol90Scale, vol50Scale){
 function getRangeData(metal){
   const m = METALS[metal];
   const ext = HIST_EXTENDED[metal];
-  const today = new Date("2026-03-13");
+  const today = new Date();
 
   let histPrices, histLabels, includeForecast=true;
 
@@ -920,7 +923,7 @@ function renderChart(){
     liveP.push(liveData[selectedMetal]||null);
 
     const bands=buildConfidenceBands(m.future,0.075,0.038);
-    const today=new Date("2026-03-13");
+    const today=new Date();
     for(let i=0;i<m.future.length;i++){
       const d=new Date(today); d.setDate(today.getDate()+i+1);
       labels.push(d.toLocaleDateString("en-IN",{month:"short",day:"numeric"}));
@@ -1058,7 +1061,7 @@ function render4Panel(){
   metalKeys.forEach(metal=>{
     const m=METALS[metal];
     const histLen=m.hist.length;
-    const today=new Date("2026-03-13");
+    const today=new Date();
     const startDate=new Date(today); startDate.setDate(today.getDate()-histLen+1);
     const labels=[], hD=[], fD=[], cu=[], cl=[];
 
@@ -1272,8 +1275,9 @@ function pfForecastValues(){
     let val = 0;
     portfolio.forEach(h=>{
       const m = METALS[h.metal];
+      if(!m) return;
       const unitForecast = m.future[Math.min(i, m.future.length-1)];
-      const ibjaForecast = unitForecast * (IBJA_MULT[metal] || 1.0784);
+      const ibjaForecast = unitForecast * (IBJA_MULT[h.metal] || 1.0784); // ← h.metal not metal
       const perGram      = ibjaForecast / PF_IBJA_UNIT_G[h.metal];
       const purity       = pfPurityFactor(h);
       val += (Number(h.qty)||0) * purity * perGram;
@@ -1498,7 +1502,10 @@ function buildPortfolio(){
         </div>
         <div>
           <div style="font-size:9px;color:#666;margin-bottom:5px">PURCHASE DATE</div>
-          <input id="pf-date" class="pf-input" type="date" value="2026-03-13"/>
+          <input id="pf-date" class="pf-input" type="date" 
+            value="${new Date().toISOString().slice(0,10)}"
+            max="${new Date().toISOString().slice(0,10)}"
+            min="2000-01-01"/>
         </div>
         <div>
           <div style="font-size:9px;color:#666;margin-bottom:5px">NOTE (optional)</div>
@@ -1737,7 +1744,7 @@ function renderPfChart(){
   if(!portfolio.length) return;
   const tots = pfTotals();
   const fc   = pfForecastValues();
-  const today = new Date("2026-03-13");
+  const today = new Date();
   const labels=[], hD=[], fD=[], cu=[], cl=[];
 
   // Build 30-day history from holdings hist
